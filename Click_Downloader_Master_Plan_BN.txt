@@ -1,0 +1,1143 @@
+CLICK DOWNLOADER
+সম্পূর্ণ Product Requirement, UI/UX, Technical Architecture এবং Codex Implementation Plan
+Version: 1.0
+Purpose: ব্যক্তিগত ব্যবহারের জন্য Android video/audio downloader
+
+======================================================================
+0. এই ডকুমেন্ট কীভাবে ব্যবহার করতে হবে
+======================================================================
+
+এই ফাইলটি VS Code-এর Codex-কে দেওয়া হবে। এটি কোনো sample idea নয়; এটি project-এর
+master specification। Codex implementation করার সময় এই document-এর requirement
+বাদ দিতে, নিজের মতো feature কমাতে, placeholder রেখে দিতে বা একবারে পুরো app
+generate করতে পারবে না। কাজ phase অনুযায়ী করতে হবে এবং প্রতিটি phase build,
+test ও review হওয়ার পর পরবর্তী phase-এ যেতে হবে।
+
+
+এই app Google Play-এ প্রকাশ করা হবে না। এটি personal signed APK হিসেবে ব্যবহার
+করা হবে। তাই Play Store listing বা monetization প্রয়োজন নেই। তবুও Android security,
+privacy, storage ও background-execution নিয়ম সঠিকভাবে মানতে হবে। 
+
+======================================================================
+1. Product Vision
+======================================================================
+
+Click Downloader হবে professional, modern, lightweight-feeling Android app।
+ব্যবহারকারী YouTube বা অন্য app-এ video দেখার সময় Share করে, floating shortcut
+ব্যবহার করে, link paste করে অথবা built-in browser থেকে video analyze করতে পারবে।
+Source-এ থাকা সব available video quality, codec, FPS, HDR, container, audio track
+এবং subtitle দেখানো হবে। ব্যবহারকারী নিজের ইচ্ছামতো format নির্বাচন করবে।
+
+App কখনো শুধু 1080p-তে সীমাবদ্ধ থাকবে না। Source-এ 144p, 240p, 360p, 480p,
+720p, 1080p, 1440p, 2160p/4K, 4320p/8K বা অন্য resolution থাকলে সব দেখাতে হবে।
+Source-এ 50/60/120 FPS, HDR, HDR10, HLG, AV1, VP9, HEVC বা AVC থাকলে metadata
+সহ দেখাতে হবে। কোনো format শুধু device support না করার কারণে লুকানো যাবে না।
+
+মূল নীতি:
+
+1. User-selected original resolution কখনো silently কমানো যাবে না।
+2. Source-এর original stream পাওয়া গেলে download/merge-এর সময় re-encode করা যাবে না।
+3. Compatibility নিশ্চিত করতে original file নষ্ট বা replace করা যাবে না।
+4. প্রয়োজনে original file রেখে আলাদা “Compatible Copy” তৈরি করা যাবে।
+5. Download-এর আগে exact format, codec, audio এবং compatibility জানাতে হবে।
+6. Download শেষ হওয়ার পর verification সফল না হলে Completed দেখানো যাবে না।
+7. App-এর UI দ্রুত থাকবে; extractor, browser ও media processing আলাদা heavy কাজ।
+8. কোনো advertisement, tracker বা বাধ্যতামূলক account থাকবে না।
+
+======================================================================
+2. বাস্তব Compatibility Rule
+======================================================================
+
+“সর্বোচ্চ quality” এবং “সব device-এ চলবে” সব ক্ষেত্রে একই সঙ্গে guarantee করা
+সম্ভব নয়। উদাহরণ: 8K AV1 source কোনো পুরোনো 1080p TV hardware দিয়ে play করা সম্ভব
+নয়। AV1 থেকে H.264 conversion করলে resolution একই রাখা গেলেও re-encoding-এর কারণে
+গাণিতিকভাবে original quality অপরিবর্তিত থাকে না। তাই app মিথ্যা guarantee দেবে না।
+
+সমাধান হিসেবে তিনটি action থাকবে:
+
+A. DOWNLOAD ORIGINAL
+- ব্যবহারকারী যে resolution/format নির্বাচন করবে, ঠিক সেটি download হবে।
+- Separate video/audio হলে lossless remux/merge হবে; video re-encode হবে না।
+- Original resolution, FPS, HDR ও codec অক্ষত থাকবে।
+- Device support না করলে warning থাকবে, download বন্ধ করা হবে না।
+
+B. PREFER COMPATIBLE STREAM AT SAME QUALITY
+- একই resolution-এ একাধিক codec থাকলে current device-এ hardware-supported option
+  list-এর উপরে দেখানো হবে।
+- যেমন 1080p AVC এবং 1080p VP9 দুটো থাকলে AVC compatible badge পেতে পারে।
+- User চাইলে VP9/AV1 original option-ও নির্বাচন করতে পারবে।
+- Compatible option নির্বাচন মানে resolution কমানো নয়।
+
+C. MAKE COMPATIBLE COPY
+- Original download অক্ষত রেখে দ্বিতীয় MP4 file তৈরি করবে।
+- Target হবে MP4 + H.264/AVC + AAC-LC + 8-bit YUV420p।
+- Resolution defaultভাবে original-এর সমান রাখার চেষ্টা করবে।
+- Target device 4K support না করলে user-এর অনুমতি ছাড়া 1080p করা যাবে না।
+- Conversion-এর আগে estimated time, battery, heat ও required free space দেখাবে।
+- Compatible copy আলাদা filename পাবে, যেমন “Video Name - Compatible.mp4”।
+
+Format card badge:
+
+- Plays on this phone
+- Hardware supported
+- Software playback may be required
+- May not play on older TVs
+- Video only; audio will be merged
+- Original quality
+- Conversion required for universal copy
+
+======================================================================
+3. Supported Input Methods
+======================================================================
+
+3.1 SHARE TARGET, PRIMARY METHOD
+
+Android Sharesheet-এ Click Downloader icon থাকবে। YouTube বা অন্য app-এ:
+
+Video > Share > Click Downloader > Analyze > Quality Sheet > Download
+
+Share করার পর full app home screen না খুলে একটি fast, translucent quick-action
+screen বা compact activity খুলবে। এতে thumbnail skeleton, Analyze progress এবং
+তারপর resolution bottom sheet দেখাবে। Download শুরু হলে activity নিজে বন্ধ হয়ে
+আগের app-এ ফিরে যাবে। Error হলে সাধারণ ভাষায় কারণ ও Retry/Open Full App থাকবে।
+
+Android Intent.ACTION_SEND, text/plain এবং supported URL intent সঠিকভাবে handle
+করতে হবে। একই intent দুইবার process করা যাবে না। Malformed বা একাধিক URL থাকলে
+user-কে নির্বাচন করতে দিতে হবে।
+
+3.2 MANUAL PASTE
+
+Home screen-এ বড় URL input, Paste এবং Analyze button থাকবে। App foreground-এ
+আসলে clipboard-এ URL থাকলে privacy-friendly suggestion দেখাবে; user tap না করা
+পর্যন্ত clipboard content server বা analyzer-এ পাঠানো যাবে না। Android clipboard
+restriction bypass করার চেষ্টা করা যাবে না।
+
+3.3 OPEN WITH CLICK DOWNLOADER
+
+Supported http/https link থেকে Android “Open with” flow ব্যবহার করা যাবে। App-কে
+সব web link-এর default browser বানানোর aggressive চেষ্টা করা যাবে না। User নিজে
+Click Downloader নির্বাচন করলে link analyze হবে।
+
+3.4 BUILT-IN BROWSER
+
+Optional lightweight browser থাকবে। এটি default home screen হবে না এবং app startup-
+এ initialize হবে না। Browser feature:
+
+- Address/search bar
+- Back, forward, refresh, home
+- Desktop/mobile user-agent switch
+- Page-এর detected downloadable media list
+- Current page Share/Copy URL
+- Login session support
+- Per-site clear cookies
+- Incognito session
+- Browser exit করলে WebView release
+
+Browser সব encrypted media ধরতে পারবে এমন দাবি করা যাবে না। Password কখনো app
+database বা log-এ লেখা যাবে না। WebView cookie শুধু user-enabled extractor session-
+এ ব্যবহার হবে।
+
+3.5 OPTIONAL FLOATING DOWNLOAD BUBBLE
+
+Screen-এর পাশে draggable Click Downloader bubble থাকতে পারবে। এর জন্য “Display
+over other apps” permission user নিজে enable করবে। Bubble-এর বৈশিষ্ট্য:
+
+- ছোট circular branded icon
+- Left/right edge snap
+- Opacity ও size setting
+- Long press করে hide/close
+- শুধু selected apps-এ দেখানোর allowlist
+- Analyze চললে spinner; download শুরু হলে progress ring
+- Screen rotation ও app change-এর পর position মনে রাখা
+
+Android sandbox-এর কারণে সাধারণ overlay অন্য app-এর current URL সরাসরি পড়তে পারে
+না। তাই bubble-এর reliable কাজ হবে clipboard URL analyze অথবা user-guided Share
+flow। Optional Accessibility-assisted mode থাকলে onboarding-এ পরিষ্কার privacy
+warning দিতে হবে। এটি YouTube-এর Share/Copy Link UI automate করতে পারে, কিন্তু UI
+পরিবর্তনে ভাঙতে পারে। Accessibility failure হলে Share method দেখাতে হবে।
+
+YouTube app-এর নিজের layout-এর মধ্যে button inject করা হবে না। Root, Xposed বা
+modified YouTube APK এই project-এর default scope নয়।
+
+======================================================================
+4. Target Source Categories
+======================================================================
+
+Extractor engine broadly supported public/non-DRM sources handle করার জন্য design
+হবে। Initial regression list-এ অন্তত:
+
+- YouTube video, Shorts, supported playlists এবং non-DRM live content
+- Facebook public video ও Reels
+- Instagram public video ও Reels
+- TikTok
+- X/Twitter video
+- Vimeo
+- Dailymotion
+- Reddit-hosted media
+- Pinterest media where supported
+- SoundCloud ও supported audio sources
+- Direct MP4/MKV/WebM/MOV/MP3/M4A/AAC/FLAC URLs
+- HLS/M3U8
+- DASH/MPD
+- Public news ও media pages supported by extractor
+- Login/session-required content যেখানে user-এর বৈধ access আছে এবং extractor কাজ করে
+
+Support dynamic হবে। Website পরিবর্তন, CAPTCHA, login expiry, geo restriction,
+rate limit বা server-side protection-এর কারণে source সাময়িকভাবে fail করতে পারে।
+UI-তে “সব website সবসময় চলবে” লেখা যাবে না।
+
+Explicit non-goals:
+
+- Widevine/FairPlay/PlayReady বা অন্য DRM bypass
+- Paid encrypted service-এর protected offline file
+- User-এর access নেই এমন private content bypass
+- CAPTCHA/security protection circumvention
+- Deleted/unavailable media পুনরুদ্ধার
+- Source-এর চেয়ে বেশি real resolution সৃষ্টি
+
+======================================================================
+5. Format Discovery এবং Quality Sheet
+======================================================================
+
+Analyzer successful হলে normalized metadata model তৈরি করবে:
+
+- Title
+- Description, optional
+- Creator/channel/uploader
+- Source platform এবং canonical URL
+- Thumbnail list
+- Duration
+- Upload date, available হলে
+- Is live / was live / upcoming
+- Playlist information
+- Chapters
+- Available subtitle languages
+- Available audio languages
+- Every video/audio/muxed format
+- Estimated or exact filesize
+- Expiry hints when detectable
+
+Quality Sheet-এ কোনো available format বাদ যাবে না। Default grouping:
+
+1. Recommended for this phone
+2. Video with audio
+3. Best video + best audio merge
+4. Video only
+5. Audio only
+6. Other/source formats
+
+Resolution অনুযায়ী descending order থাকবে। একই resolution-এর variants expand করলে:
+
+- Format ID
+- Width x height
+- FPS
+- Video bitrate
+- Video codec/profile/level
+- Container
+- HDR/SDR এবং bit depth
+- Audio included কি না
+- Audio codec ও bitrate
+- Approximate size
+- Native hardware support status
+- Merge/conversion requirement
+
+Top quick choices:
+
+- Best Available Original
+- Best for This Phone
+- Smallest File
+- Audio Only
+
+Default setting হবে “Ask Every Time”। User যদি default preference সংরক্ষণ করে,
+তবুও Quality Sheet skip করার জন্য আলাদা toggle লাগবে। Unknown filesize হলে “Size
+unknown” দেখাতে হবে; মিথ্যা সংখ্যা বানানো যাবে না।
+
+“Best Available Original” মানে source-এর সর্বোচ্চ resolution/FPS/quality scoring
+অনুযায়ী format। Tie হলে bitrate, dynamic range, codec efficiency ও audio quality
+দেখিয়ে user-কে সিদ্ধান্তের সুযোগ দিতে হবে। App resolution silently cap করবে না।
+
+======================================================================
+6. Audio Download System
+======================================================================
+
+Audio Only section-এ source-এর সব audio stream দেখাতে হবে:
+
+- Original codec: Opus, AAC/M4A, MP3, Vorbis, FLAC ইত্যাদি
+- Bitrate
+- Sample rate
+- Channel count
+- Language
+- Filesize
+- Original/converted badge
+
+Quick choices:
+
+- Best Original Audio
+- M4A Compatible
+- MP3 High Quality
+- MP3 Medium
+- Small Audio File
+
+Original audio পাওয়া গেলে copy/remux করতে হবে। MP3 requested কিন্তু source Opus/AAC
+হলে conversion হবে এবং তা UI-তে জানাতে হবে। Metadata options:
+
+- Embed title, artist, album/source
+- Embed thumbnail/cover
+- Preserve chapters when supported
+- Custom filename
+- Download thumbnail separately
+
+======================================================================
+7. Subtitle, Thumbnail, Chapter এবং Metadata
+======================================================================
+
+- Manual এবং auto-generated subtitle আলাদা দেখাতে হবে।
+- ভাষা নির্বাচন ও multiple subtitle download করা যাবে।
+- Original VTT/SRT/TTML format রাখা অথবা SRT conversion option থাকবে।
+- Video-তে subtitle embed করা optional; original media defaultভাবে পরিবর্তন নয়।
+- Thumbnail quality নির্বাচন করা যাবে।
+- Chapters metadata বা আলাদা chapter file হিসেবে রাখা যাবে।
+- Metadata embedding fail করলে video download fail হিসেবে চিহ্নিত হবে না; warning হবে।
+
+======================================================================
+8. Playlist, Batch এবং Live Media
+======================================================================
+
+Playlist URL হলে আগে item list দেখাতে হবে। Select all, select none, range এবং
+individual selection থাকবে। প্রতিটি item-এর জন্য default quality rule ব্যবহার হবে,
+কিন্তু চাইলে item-specific override করা যাবে। বিশাল playlist accidental download
+রোধে item count ও estimated storage confirmation থাকবে।
+
+Batch features:
+
+- Multiple pasted URLs
+- Share করা একাধিক link
+- Duplicate URL detection
+- Queue reorder
+- Priority download
+- Failed-only retry
+- Completed/skipped summary
+
+Live/non-DRM stream যেখানে extractor support করে:
+
+- Download from current point
+- Download from beginning, source অনুমতি দিলে
+- Stop and finalize recording
+- Live duration, bytes এবং elapsed time display
+- Interrupted live file playable করার recovery attempt
+
+======================================================================
+9. Download Pipeline
+======================================================================
+
+প্রতিটি job persistent state machine হবে:
+
+CREATED
+> ANALYZING
+> WAITING_FOR_SELECTION
+> QUEUED
+> PREPARING
+> DOWNLOADING_VIDEO/AUDIO/FRAGMENTS
+> MERGING
+> OPTIONAL_CONVERSION
+> VERIFYING
+> COMPLETED
+
+Failure states:
+
+PAUSED, WAITING_FOR_NETWORK, AUTH_REQUIRED, LINK_EXPIRED, STORAGE_REQUIRED,
+RETRY_SCHEDULED, FAILED, CANCELLED
+
+Rules:
+
+- Direct progressive file server Range Request support করলে exact resume।
+- HLS/DASH-এ completed fragment index persist করা।
+- Partial file “.part” বা app-managed temporary name-এ রাখা।
+- Finalization atomic হবে; incomplete file Gallery-তে final হিসেবে দেখা যাবে না।
+- Retry exponential backoff + jitter ব্যবহার করবে।
+- HTTP 403/410 বা signed URL expiry হলে re-extract করে একই format match করার চেষ্টা।
+- Retry অন্য resolution-এ silently চলে যাবে না। Exact format unavailable হলে user
+  confirmation লাগবে।
+- Duplicate content/filename-এ Skip, Replace, Keep Both থাকবে।
+- Cancel করলে partial file Keep/Delete setting অনুযায়ী কাজ করবে।
+- Temporary cleanup শুধু job state যাচাই করে করতে হবে।
+
+Download concurrency device ও network অনুযায়ী adaptive হবে। Fixed অত্যধিক thread
+ব্যবহার করা যাবে না। Server rate limit বা throttling detect হলে fragment count কমবে।
+
+======================================================================
+10. Download Completion Verification
+======================================================================
+
+Completed status দেওয়ার আগে:
+
+- File exists এবং expected non-zero size
+- Container readable
+- Video stream expected হলে উপস্থিত
+- Audio stream selected হলে উপস্থিত
+- Selected resolution/FPS/codec-এর সঙ্গে result মেলে
+- Duration reasonable এবং manifest metadata-এর কাছাকাছি
+- Start, middle ও end-এর sample decode/read সফল
+- Merge output truncated নয়
+- File extension actual container-এর সঙ্গে মেলে
+- MediaStore entry final path-এর সঙ্গে মেলে
+
+Checksum source থেকে পাওয়া গেলে verify করা যাবে। Source checksum না থাকলে app কোনো
+fake checksum expectation বানাবে না। Verification fail হলে temporary inputs মুছবে
+না; repair/remux/retry option দেবে।
+
+======================================================================
+11. Main Screens এবং UI/UX
+======================================================================
+
+Design language:
+
+- Deep navy/charcoal background
+- Electric blue primary accent
+- Green success, amber warning, soft red error
+- AMOLED black theme optional
+- Material 3 ভিত্তি, কিন্তু generic template-looking UI নয়
+- পরিষ্কার typography, Bangla glyph support
+- Compact spacing; অতিরিক্ত ফাঁকা জায়গা নয়
+- বড় tap target, one-hand friendly actions
+- Low-end mode-এ heavy blur ও animation বন্ধ
+
+Bottom navigation:
+
+1. Home
+2. Downloads
+3. Library
+4. Settings
+
+11.1 HOME
+
+- App logo/name ও settings shortcut
+- Large paste field
+- Paste এবং Analyze primary action
+- Share-from-other-app short instruction
+- Built-in Browser shortcut
+- Recent downloads, horizontally নয় বরং efficient compact list/grid
+- Active download mini panel
+- Empty state useful হবে, decorative clutter নয়
+
+11.2 QUICK ANALYZE ACTIVITY
+
+- Sharesheet থেকে দ্রুত open
+- Skeleton loading
+- Cancel
+- Quality sheet
+- Download Now / Add to Queue
+- Start হলে toast-এর বদলে accessible confirmation + notification
+- আগের app-এ দ্রুত return
+
+11.3 DOWNLOADS
+
+Tabs: Active, Queue, Completed, Failed
+
+প্রতিটি card:
+
+- Thumbnail
+- Title
+- Platform icon/name
+- Quality/codec
+- Downloaded size / total size
+- Percentage
+- Current speed
+- Remaining time, reliable হলে
+- Current stage: video/audio/merge/verify
+- Pause/Resume, retry, cancel
+- Expand করলে detailed progress/log summary
+
+Global actions:
+
+- Pause all
+- Resume all
+- Retry failed
+- Clear completed history, file delete নয় unless explicitly selected
+- Queue reorder
+
+11.4 LIBRARY
+
+- Videos, Audio, Playlists filters
+- Search
+- Sort by date/title/size/source/resolution
+- Grid/list switch
+- Play, share, rename, move, delete
+- “Make Compatible Copy” action
+- File missing হলে database entry repair/remove
+- App-এর বাইরে deleted/moved file handle করা
+
+11.5 SETTINGS
+
+General:
+- Bangla/English/System language
+- Light/Dark/AMOLED/System theme
+- Download directory
+- Video filename template
+- Audio filename template
+- Ask quality every time
+- Default quick action
+
+Network:
+- Wi-Fi only
+- Confirm mobile data
+- Allow roaming
+- Speed limit
+- Concurrent downloads: Auto/1/2/3
+- Fragment connections: Auto/advanced manual
+- Retry count ও timeout
+
+Quality:
+- Show every source format, always enabled
+- Prefer hardware-supported option in recommendations
+- Preferred container/codec, hide নয়
+- Prefer HDR/SDR
+- Prefer 60 FPS
+- Default audio language
+- Subtitle preferences
+
+Processing:
+- Merge automatically
+- Keep temporary files on failure
+- Verify final file
+- Compatible-copy preset
+- Allow conversion while battery low
+- Allow conversion while device hot
+
+Browser & Sessions:
+- Cookie/session list per site
+- Clear site data
+- Incognito default
+- Accessibility-assisted bubble toggle
+
+Privacy & Maintenance:
+- No analytics by default
+- Clear history
+- Clear thumbnails/cache
+- Clear temporary files with size preview
+- Export/import settings excluding secrets by default
+- View engine version
+- Check extractor update
+- Roll back last engine update
+
+======================================================================
+12. Notification System
+======================================================================
+
+Download foreground notification-এ:
+
+- Title
+- Progress
+- Speed ও remaining size/time
+- Current processing stage
+- Pause/Resume
+- Cancel
+- Next item count
+
+Multiple jobs হলে summary notification এবং active job child notification ব্যবহার
+করা যাবে, কিন্তু notification spam করা যাবে না। Download complete notification tap
+করলে file play/open হবে। Failed notification tap করলে exact recovery screen খুলবে।
+
+======================================================================
+13. Error Experience
+======================================================================
+
+Raw stack trace main UI-তে নয়। User-facing error উদাহরণ:
+
+- Linkটির মেয়াদ শেষ হয়েছে; আবার Analyze করুন।
+- এই video দেখতে login প্রয়োজন।
+- Source এই মুহূর্তে request block করছে; পরে Retry করুন।
+- নির্বাচিত quality আর পাওয়া যাচ্ছে না; নতুন format list দেখুন।
+- Server resume support করে না।
+- পর্যাপ্ত storage নেই; আরও X GB প্রয়োজন।
+- Video DRM দিয়ে সুরক্ষিত, তাই download করা যাবে না।
+- Video download হয়েছে কিন্তু audio merge হয়নি; Repair চাপুন।
+- Extractor update প্রয়োজন হতে পারে।
+
+প্রতিটি error-এর সঙ্গে relevant action: Retry, Re-analyze, Login, Change Folder,
+View Formats, Repair বা Details। Technical details copy করা যাবে, কিন্তু cookies,
+authorization header, full signed URL বা personal token redact করতে হবে।
+
+======================================================================
+14. Recommended Technical Architecture
+======================================================================
+
+Android layer:
+
+- Kotlin
+- Jetpack Compose + Material 3
+- Single-activity navigation where practical
+- MVVM/Clean modular architecture
+- Coroutines and Flow
+- Room persistent database
+- DataStore preferences
+- Hilt বা একটি lightweight dependency-injection solution
+- Media3/ExoPlayer built-in playback and capability checking
+- Coil thumbnail loading with strict cache limits
+- OkHttp for app-level networking/direct downloads where suitable
+- Android Foreground Service for user-started active download
+- WorkManager for recovery, retry, maintenance এবং deferred jobs
+- MediaStore/Storage Access Framework for final files
+
+Engine layer:
+
+- yt-dlp-compatible broad extractor engine, isolated behind an interface
+- Embedded Python/runtime solution selected after proof-of-concept benchmark
+- FFmpeg/ffprobe native binaries or maintained equivalent for merge/probe/conversion
+- Per-ABI native packaging
+- Extractor এবং media processing main UI process থেকে isolated
+- Structured progress events; raw command text parse-এর ওপর UI নির্ভর করবে না
+- Engine crash হলে UI process বেঁচে থাকবে এবং job recoverable হবে
+
+Required Gradle modules, conceptual:
+
+- app-ui
+- domain
+- data
+- extractor-api
+- extractor-implementation
+- download-engine
+- media-processing
+- storage
+- browser
+- shared-models
+- benchmark
+- test-support
+
+অতিরিক্ত module শুধু architecture দেখানোর জন্য তৈরি করা যাবে না। Build complexity
+ও method count যাচাই করে sensible grouping করতে হবে।
+
+======================================================================
+15. Extractor Update System
+======================================================================
+
+Website দ্রুত পরিবর্তিত হয়, তাই APK update ছাড়া extractor update করার ব্যবস্থা
+চাই। তবে remote arbitrary code নিরাপত্তাহীনভাবে execute করা যাবে না।
+
+Requirements:
+
+- Signed engine/update manifest
+- HTTPS এবং normal certificate validation
+- Version, checksum, size ও compatibility metadata
+- Download-এর পর signature/hash verification
+- Atomic activation
+- Previous known-good engine রেখে rollback
+- Update fail হলে বর্তমান engine অক্ষত
+- Stable ও optional beta channel
+- Engine version per diagnostic report
+- User-controlled update; silent forced replacement নয়
+
+যদি safe external engine update প্রথম release-এ অত্যন্ত জটিল হয়, APK update দিয়ে
+শুরু করা যাবে; কিন্তু architecture future engine update support করার মতো রাখতে হবে।
+
+======================================================================
+16. Storage এবং File Management
+======================================================================
+
+Default folder: user-selected Click Downloader directory অথবা MediaStore Downloads।
+Logical folders:
+
+- Videos
+- Audio
+- Playlists
+- Temporary
+
+Requirements:
+
+- Internal storage ও supported SD card
+- Persisted folder permission
+- Download শুরুর আগে available space check
+- Separate audio/video/temporary merge space estimation
+- FAT32 4 GB limit detect/communicate when applicable
+- Safe filename sanitization
+- Reserved character এবং excessive filename length handling
+- Duplicate filename policy
+- Atomic final rename/move
+- Orphan temporary file cleanup with age/job-state safety
+- App uninstall করলে user media অকারণে delete নয়
+
+======================================================================
+17. Performance এবং Lightweight Requirements
+======================================================================
+
+“Lightweight” শুধু APK size নয়। Startup, RAM, scrolling, battery, heat, network এবং
+background reliability সব মাপতে হবে।
+
+17.1 STARTUP
+
+- Home screen startup-এ Python, FFmpeg বা WebView initialize করা যাবে না।
+- Lazy initialization বাধ্যতামূলক।
+- Splash শুধু প্রয়োজনীয় সময় থাকবে; artificial delay নয়।
+- Baseline Profile এবং Startup Profile যোগ করতে হবে।
+- Release build-এ R8/resource shrinking ব্যবহার করতে হবে।
+
+Performance target, test দ্বারা validate:
+
+- Normal midrange device cold start লক্ষ্য <= 1.5 seconds
+- Representative low-end device লক্ষ্য <= 2.5 seconds
+- Warm start লক্ষ্য <= 700 ms
+- Startup-এ কোনো network dependency নয়
+
+17.2 UI SMOOTHNESS
+
+- Lazy lists এবং stable item keys
+- Progress event throttling; প্রতি byte-এ UI recomposition নয়
+- Visible item ছাড়া thumbnail decode নয়
+- Large bitmap full resolution memory-তে নয়
+- Main thread-এ network, database, file probe বা JSON-heavy work নয়
+- Compose recomposition এবং jank Macrobenchmark দিয়ে পরীক্ষা
+- Low-end mode-এ blur, shadow ও continuous animation কমানো
+- Orientation change-এ job/reselection হারানো যাবে না
+
+17.3 MEMORY
+
+- UI process এবং engine process আলাদা memory lifecycle
+- Analyzer শেষ হলে unnecessary Python objects/process release
+- Browser exit-এ WebView teardown
+- FFmpeg output buffer memory-তে ধরে নয়, streamed/file based
+- Thumbnail memory cache bounded
+- Low-memory callback handle করা
+- 2 GB RAM test device-এ app-kill/recovery পরীক্ষা
+
+17.4 CPU, HEAT এবং BATTERY
+
+- Remux preferred; unnecessary transcoding নিষিদ্ধ
+- Low-end ফোনে conversion ও multiple high-speed downloads একসঙ্গে নয়
+- Thermal status অনুযায়ী fragment concurrency/conversion throttle
+- Battery low হলে warning; user setting অনুযায়ী pause
+- Charger connected optimization optional
+- Screen off অবস্থায় reliable but no busy-loop
+
+17.5 NETWORK
+
+- Auto concurrency device, network ও server response অনুযায়ী
+- Low-end: সাধারণত 1 download, 2 fragments
+- Balanced: 2 downloads, 3-4 fragments
+- Powerful: সর্বোচ্চ 3 downloads, 6-8 fragments when useful
+- বেশি connection মানেই সবসময় বেশি speed নয়; benchmark/feedback দিয়ে adapt
+- Connectivity change এবং metered network handle
+- DNS/IPv4/IPv6 failure fallback OS/network policy অনুযায়ী
+- No infinite retry loop
+
+17.6 APK SIZE
+
+Embedded extractor runtime এবং FFmpeg থাকার কারণে full universal APK বড় হবে। শুধু
+দেখানোর জন্য unrealistic ছোট size target রাখা যাবে না। Optimization:
+
+- arm64-v8a ও armeabi-v7a আলাদা release APK
+- Unused native codec/component বাদ
+- Resource shrinking
+- Duplicate libraries বাদ
+- Debug symbol release APK-এর বাইরে
+- Full এবং optional Lite flavor কেবল maintenance যুক্তিযুক্ত হলে
+
+Primary personal phone arm64 হলে arm64 APK-ই install করা হবে। Universal APK backup
+হতে পারে, default নয়।
+
+======================================================================
+18. Device Capability Detection এবং Built-in Playback
+======================================================================
+
+MediaCodec capability দিয়ে current device-এর codec, resolution, profile, level,
+HDR এবং secure/non-secure decoder support পরীক্ষা করতে হবে। Result Quality Sheet-
+এ badge হিসেবে দেখাতে হবে। Capability check ভুল positive দিলে sample playback
+fallback ব্যবহার করা যেতে পারে।
+
+Built-in player:
+
+- Media3/ExoPlayer
+- Video, audio, subtitle playback
+- Playback speed
+- Aspect ratio/fit controls
+- Hardware decoder first
+- Software fallback only if packaged/feasible and device can handle it
+- Unsupported file হলে “Make Compatible Copy” action
+
+Built-in player থাকলেও পুরোনো hardware-এ 4K/8K smooth play guarantee করা যাবে না।
+
+======================================================================
+19. Privacy এবং Security
+======================================================================
+
+- Local-first; link resolver/download defaultভাবে phone-এ
+- No ads, analytics বা telemetry by default
+- No compulsory account
+- Cookies/session encrypted at rest
+- Android backup-এ sensitive cookies exclude
+- Password capture/log নিষিদ্ধ
+- Full signed URLs, headers ও cookies logs-এ redact
+- Standard TLS validation বন্ধ নয়
+- Redirect limit এবং malformed URL defense
+- Untrusted filename/path traversal defense
+- Downloaded APK/executable warning
+- Exported Android components minimum এবং permission protected
+- PendingIntent immutable/mutable flags সঠিক
+- Signed release APK
+- Signing keystore-এর encrypted offline backups
+- Same signing key দিয়ে সব update
+- Dependency ও native binary origin/checksum document করা
+
+======================================================================
+20. Accessibility এবং Localization
+======================================================================
+
+- বাংলা ও English সম্পূর্ণ string resources
+- Hardcoded UI text নয়
+- বাংলা font rendering এবং truncation test
+- Screen reader content descriptions
+- Minimum touch target
+- Dynamic font size
+- Sufficient color contrast
+- Progress শুধু color দিয়ে নয়, text/status দিয়েও
+- RTL future-safe layout যেখানে practical
+- Error ও permission explanation non-technical language
+
+======================================================================
+21. Permissions
+======================================================================
+
+Minimum permission principle:
+
+- Internet
+- Network state
+- Foreground service/data sync প্রয়োজন অনুযায়ী
+- Notification runtime permission supported Android versions-এ
+- User-selected storage/MediaStore access
+- Display over other apps শুধু bubble enable করলে
+- Accessibility service শুধু explicit advanced feature enable করলে
+
+সব permission first launch-এ একসঙ্গে চাইবে না। Feature ব্যবহার করার মুহূর্তে কারণ
+দেখিয়ে চাইবে। Permission deny করলে core Paste/Share download যতটা সম্ভব কাজ করবে।
+
+======================================================================
+22. Database এবং Job Recovery
+======================================================================
+
+Room database-এ অন্তত:
+
+- DownloadJob
+- MediaMetadata
+- SelectedFormat
+- FragmentState/checkpoint
+- OutputFile
+- Playlist এবং playlist items
+- Error/retry summary
+- App/engine version used
+
+Cookie secret raw Room table-এ নয়; encrypted storage abstraction। Process death,
+force stop, reboot এবং app update-এর পরে database migration ও job recovery test করতে
+হবে। Running state app restart-এ blindly running রাখা যাবে না; filesystem এবং active
+service যাচাই করে correct state নির্ধারণ করতে হবে।
+
+======================================================================
+23. Testing Strategy
+======================================================================
+
+23.1 AUTOMATED TESTS
+
+- URL parsing/normalization
+- Format sorting and recommendation
+- No resolution filtering regression
+- Filename sanitization
+- Storage estimation
+- State machine transitions
+- Retry/backoff
+- Duplicate detection
+- Database migrations
+- Compatibility scoring
+- Redaction of secrets
+- Engine response parsing
+
+23.2 INSTRUMENTED/UI TESTS
+
+- Paste > Analyze > Select > Download
+- Android Share > Quick sheet > Download
+- Permission denial/retry
+- Process kill during download
+- Rotation/background/foreground
+- Notification actions
+- Playlist selection
+- Make Compatible Copy
+- Bangla/English layouts
+- Large font
+
+23.3 REAL DEVICE MATRIX
+
+- Android 8/9 class older device where available
+- Android 11/12
+- Android 13/14
+- Current supported Android version
+- 2 GB RAM low-end
+- 4 GB RAM mainstream
+- 8 GB+ powerful phone
+- arm64 primary; armv7 if supported
+- Small phone, large phone, tablet layout
+
+23.4 FAILURE MATRIX
+
+- Slow 2G/3G-like network
+- Wi-Fi to mobile data switch
+- Network disconnect/reconnect
+- Server Range unsupported
+- Expiring signed URL
+- HTTP 403/429/5xx
+- Storage full mid-download
+- SD card removed
+- App swipe away/process killed
+- Phone restart
+- Battery saver/doze
+- Duplicate filename
+- Corrupt fragment
+- Audio download succeeds, video fails এবং বিপরীত
+- Merge/conversion failure
+- Extractor crash/update failure
+
+23.5 SOURCE REGRESSION
+
+প্রতিটি supported platform-এর জন্য legal/public test URLs-এর ছোট regression set
+রাখতে হবে। Success শুধু metadata extraction নয়; format list, one small download এবং
+final verification test করতে হবে। Test URLs expire/delete হলে maintain করতে হবে।
+
+======================================================================
+24. Release এবং Update
+======================================================================
+
+- Debug এবং Release configuration আলাদা
+- Release signed APK
+- Version name/code discipline
+- arm64 এবং armv7 assets clearly named
+- Private GitHub Release বা অন্য trusted personal distribution
+- In-app update check optional
+- Update user tap ছাড়া silently install নয়
+- Changelog
+- Database migration test before release
+- Previous stable APK রাখা
+- Signing key হারালে same-app update অসম্ভব; secure backup বাধ্যতামূলক
+
+======================================================================
+25. Development Phases এবং Acceptance Gates
+======================================================================
+
+PHASE 0: REPOSITORY AUDIT ও REQUIREMENT LOCK
+
+- Existing code/build/dependency audit
+- Current APK size এবং architecture report
+- Supported Android versions সিদ্ধান্ত
+- UI wireframe
+- Module plan
+- Risk register
+
+Gate: user review ছাড়া implementation শুরু নয়।
+
+PHASE 1: APP FOUNDATION
+
+- Theme, navigation, localization
+- Database, settings, storage abstraction
+- Dummy local job state দিয়ে UI flow
+- Release/debug build
+- Baseline test setup
+
+Gate: app clean launch, navigation smooth, no heavy engine startup।
+
+PHASE 2: DIRECT FILE DOWNLOADER
+
+- Paste/Share
+- Direct HTTP media
+- Queue, pause/resume/retry/cancel
+- Notification
+- Storage finalization
+- Verification
+
+Gate: network interruption ও process death test pass।
+
+PHASE 3: EXTRACTOR এবং ALL-FORMAT QUALITY UI
+
+- Extractor interface/implementation
+- Metadata normalization
+- Every source format display
+- Compatibility badge
+- Audio-only formats
+- Quick recommendations, কিন্তু no hidden formats
+
+Gate: chosen format ID/resolution silently পরিবর্তিত হয় না।
+
+PHASE 4: HLS/DASH এবং MERGE
+
+- Fragment download/checkpoint
+- Separate video/audio
+- FFmpeg lossless merge/remux
+- Subtitle/thumbnail/metadata
+- Final media verification
+
+Gate: 1080p/4K representative separate-track samples pass; audio missing নয়।
+
+PHASE 5: PLAYLIST, BATCH এবং LIVE
+
+- Selection UI
+- Queue rules
+- Storage confirmation
+- Supported live capture/finalize
+
+Gate: partial failures অন্য items নষ্ট করে না।
+
+PHASE 6: BUILT-IN BROWSER এবং SESSION
+
+- Lazy WebView
+- Login/cookies
+- Detected media
+- Incognito/clear session
+- Secret redaction
+
+Gate: browser exit memory cleanup এবং cookie privacy test।
+
+PHASE 7: FLOATING BUBBLE
+
+- Overlay permission onboarding
+- Draggable bubble
+- Clipboard/share assistance
+- Optional accessibility flow
+- Failure fallback
+
+Gate: bubble বন্ধ থাকলে zero background overhead; অন্য apps disturb নয়।
+
+PHASE 8: COMPATIBLE COPY এবং PLAYER
+
+- Capability detection
+- Built-in player
+- Explicit conversion workflow
+- Original file preservation
+- Thermal/storage handling
+
+Gate: original file অপরিবর্তিত; compatible output independently verified।
+
+PHASE 9: OPTIMIZATION ও HARDENING
+
+- Startup/baseline profile
+- Memory/jank benchmark
+- Low RAM behavior
+- Per-ABI build size
+- Security audit
+- Full failure matrix
+
+Gate: measured report ছাড়া “optimized” দাবি নয়।
+
+PHASE 10: PERSONAL RELEASE
+
+- Signed APK
+- Changelog
+- Install/update test
+- Keystore backup confirmation
+- Recovery instructions
+
+======================================================================
+26. Codex Working Rules
+======================================================================
+
+Codex-কে নিচের নিয়ম মানতে হবে:
+
+1. প্রথমে repository ও এই specification সম্পূর্ণ পড়তে হবে।
+2. একবারে পুরো app generate করা যাবে না। Phase-by-phase কাজ করতে হবে।
+3. প্রতিটি phase-এর আগে affected files ও implementation plan সংক্ষেপে জানাতে হবে।
+4. Existing user changes overwrite/delete করা যাবে না।
+5. Placeholder, fake download, fake progress বা hardcoded demo metadata final code-এ নয়।
+6. Build successful না হলে phase complete বলা যাবে না।
+7. Relevant automated tests run করতে হবে এবং exact result জানাতে হবে।
+8. কোনো feature skip করলে কারণ ও remaining work লিখতে হবে। Silent skip নয়।
+9. Deprecated/unmaintained dependency নেওয়ার আগে alternative ও risk যাচাই করতে হবে।
+10. Dependency version lock এবং license record রাখতে হবে।
+11. Secrets, cookies, signing key repository-তে commit করা যাবে না।
+12. UI main thread-এ blocking work নিষিদ্ধ।
+13. User-selected format silently পরিবর্তন নিষিদ্ধ।
+14. Original quality file conversion দিয়ে replace নিষিদ্ধ।
+15. DRM bypass implement করা যাবে না।
+16. README-তে setup, build, signing, supported features ও known limits রাখতে হবে।
+17. প্রতিটি গুরুত্বপূর্ণ architectural decision ADR বা clear documentation-এ রাখতে হবে।
+18. Release build physical device-এ test না করে final বলা যাবে না।
+
+======================================================================
+27. Definition of Done
+======================================================================
+
+App final তখনই বলা যাবে যখন:
+
+- YouTube/অন্য app Share থেকে Click Downloader selection কাজ করে
+- Manual paste কাজ করে
+- Source-এর সব reported formats Quality Sheet-এ দেখা যায়
+- 4K/8K source থাকলে resolution cap ছাড়া দেখায়
+- Video-only + audio-only stream সঠিকভাবে merge হয়
+- Audio-only download কাজ করে
+- Selected original resolution/codec silently কমে না
+- Current phone compatibility badge কাজ করে
+- Downloaded file verification ছাড়া Completed হয় না
+- Pause/resume/network recovery কাজ করে যেখানে server support করে
+- Process kill/reboot recovery graceful
+- Notification controls কাজ করে
+- Storage full/corrupt/expired URL error recoverable
+- Playlist এবং batch partial failure-safe
+- Original file রেখে compatible copy তৈরি হয়
+- UI low-end test phone-এ measurable smooth
+- Startup-এ extractor/browser load হয় না
+- No ad/analytics/account requirement
+- Cookies/logs নিরাপদ
+- Signed update existing installation-এর ওপর install হয়
+- Known technical limitations user-এর কাছে পরিষ্কার
+
+======================================================================
+28. বিশেষ Optimization Suggestions
+======================================================================
+
+1. App open করলেই extractor engine load না করে শুধু Analyze চাপলে load করতে হবে।
+2. yt-dlp/FFmpeg main process-এ না রেখে isolated worker/process ব্যবহার করা উচিত।
+3. UI progress সর্বোচ্চ কয়েকবার/second update করা উচিত; network-এর প্রতিটি chunk-এ নয়।
+4. Default concurrency Auto রাখা উচিত। User-এর 700-800 Mbps network থাকলেও source
+   server এবং phone storage/CPU অনুযায়ী connection বাড়াতে হবে।
+5. Original stream merge হলে codec copy/remux করতে হবে; conversion নয়।
+6. User-selected maximum quality আগে download হবে। Compatibility concern warning
+   হবে, quality limit নয়।
+7. Sharing-এর জন্য compatible copy আলাদা রাখা সবচেয়ে ভালো; original কখনো হারাবে না।
+8. Built-in browser Phase 1-এ ঢোকালে startup/memory খারাপ হবে, তাই পরে lazy module।
+9. Universal APK-এর বদলে primary phone-এর arm64 APK app size কমাবে।
+10. Extractor update rollback ছাড়া self-update চালু করা উচিত নয়।
+11. Performance claim benchmark report দিয়ে প্রমাণ করতে হবে।
+12. প্রথম stable target-এ কম source কিন্তু reliable pipeline; তারপর broad extractors
+    যোগ করা ভালো। Engine broad support দিলেও প্রত্যেক source test ছাড়া “verified” নয়।
+
+======================================================================
+29. Final Product Decision Summary
+======================================================================
+
+App name: Click Downloader
+Use: Personal Android sideload
+Ads: None
+Account: None required
+Core UI: Kotlin + Jetpack Compose/Material 3
+Core engine: Local broad extractor + FFmpeg/media processing
+Cloud server: Not required by default
+Input: Share, Paste, Open With, Browser, optional Bubble
+Quality: Source-এর সব available quality; কোনো 1080p cap নয়
+Default behavior: Ask Every Time
+Original quality: Preserve; no silent transcoding/downscaling
+Audio: All available audio formats + optional conversion
+Compatibility: Badge + same-quality compatible preference + separate compatible copy
+Download survival: Foreground service + persistent state + recovery
+Storage: User controlled, MediaStore/SAF compatible
+Performance: Lazy heavy engines, isolated process, adaptive concurrency, benchmarks
+Distribution: Signed per-ABI APK via trusted private release
+DRM bypass: Not included
+
+======================================================================
+30. Codex-এর প্রথম কাজের জন্য নির্দেশনা
+======================================================================
+
+এই specification পাওয়ার পর Codex প্রথম response-এ code লিখবে না। প্রথমে:
+
+1. Repository tree এবং existing Android project inspect করবে।
+2. কী আছে, কী usable, কী broken এবং কী missing তার audit report দেবে।
+3. Current build চালানোর নিরাপদ চেষ্টা করবে।
+4. Existing architecture বনাম এই specification gap table দেবে।
+5. Phase 0-এর final decisions এবং proposed file/module structure দেখাবে।
+6. Risks: extractor integration, FFmpeg size, Android background limits, cookies,
+   overlay/accessibility এবং old-device support আলাদা করে ব্যাখ্যা করবে।
+7. User approval পাওয়ার পর শুধু Phase 1 শুরু করবে।
+
+END OF MASTER PLAN

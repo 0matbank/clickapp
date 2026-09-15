@@ -1,0 +1,24 @@
+# Android/Gradle build output
+.gradle/
+**/build/
+local.properties
+
+# IDE files
+.idea/
+*.iml
+
+# Signing and secrets
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+
+# Native/runtime packages are acquired outside the repository
+.cxx/
+captures/
+external-toolchains/
+
+# OS files
+.DS_Store
+Thumbs.db
+
