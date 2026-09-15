@@ -21,6 +21,6 @@ include(
     ":core:model",
     ":core:domain",
     ":core:data",
+    ":core:download",
     ":core:storage",
 )
-

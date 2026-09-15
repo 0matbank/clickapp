@@ -61,5 +61,16 @@
     <string name="choose_folder">Choose folder</string>
     <string name="folder_saved">Download folder saved</string>
     <string name="folder_error">This folder could not be saved. Choose another folder.</string>
+    <string name="direct_analyze_failed">This link is not a direct public audio/video file, or the server rejected it. Supported pages require the extractor.</string>
+    <string name="download_queued">Download added to the queue.</string>
+    <string name="quick_analyze_title">Choose a link to analyze</string>
+    <string name="open_full_app">Open full app</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="retry">Retry</string>
+    <string name="cancel">Cancel</string>
+    <string name="notification_channel_downloads">Active downloads</string>
+    <string name="notification_working">Download in progress</string>
+    <string name="notification_progress">%1$d%% • %2$s</string>
+    <string name="downloaded_of_total">%1$s of %2$s</string>
 </resources>
-

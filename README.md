@@ -4,6 +4,19 @@ Click Downloader is a local-first Android video/audio downloader being implement
 
 ## Current status
 
+Phase 2 — Direct Download Pipeline is complete:
+
+- Real HTTP/HTTPS audio and video probing and byte transfer
+- Paste, Android Share and Open-With entry points, including explicit multi-URL choice
+- Durable Room-backed queue with pause, resume, retry, cancel and process-restart recovery
+- HTTP Range/If-Range continuation with preserved `.part` files and corruption-safe restart when Range is ignored
+- Foreground-service progress notifications and notification actions
+- Verified MediaStore finalization on Android 10+ and persisted SAF-folder finalization on Android 8+
+- Bounded exponential retry with jitter and explicit auth, expired-link, storage and verification failures
+- API 37 instrumentation coverage for the real direct-download, share and recovery paths
+
+Earlier foundation work remains in place:
+
 Phase 1 — App Foundation:
 
 - Kotlin, Jetpack Compose and Material 3 application shell
@@ -17,7 +30,7 @@ Phase 1 — App Foundation:
 - Debug and minified release build types
 - Unit and instrumented-test foundations
 
-Actual URL analysis, network transfers, sharesheet entry points, notifications, extractor runtimes, FFmpeg, browser, overlay, playback and conversion are intentionally not present before their master-plan phases.
+Extractor runtimes, adaptive-stream merging, playlist/live handling and the session browser are introduced in Phases 3–6.
 
 ## Prerequisites
 
@@ -59,4 +72,4 @@ The app asks for a download directory only when the user selects **Choose folder
 
 ## Known limits
 
-This foundation build does not download media. Entering a valid HTTP(S) URL records a local job in the `CREATED` state so persistence, navigation and empty/list states can be tested without pretending that analysis or downloading occurred.
+Phase 2 accepts direct media URLs. Web-page extraction, HLS/DASH, playlists, live streams and authenticated browser sessions are intentionally handled by their later phases. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.

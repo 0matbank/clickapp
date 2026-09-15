@@ -3,7 +3,7 @@ package com.clickdownloader.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.clickdownloader.core.domain.CreateLocalJobUseCase
+import com.clickdownloader.core.download.CreateDirectDownloadUseCase
 import com.clickdownloader.core.domain.DownloadJobRepository
 import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.domain.StorageGateway
@@ -26,6 +26,8 @@ data class MainUiState(
 
 enum class UiMessage {
     INVALID_URL,
+    ANALYZE_FAILED,
+    DOWNLOAD_QUEUED,
     FOLDER_SAVED,
     FOLDER_ERROR,
 }
@@ -34,10 +36,10 @@ class MainViewModel(
     private val jobs: DownloadJobRepository,
     private val settings: SettingsRepository,
     private val storage: StorageGateway,
+    private val createDirectDownload: CreateDirectDownloadUseCase,
 ) : ViewModel() {
     private val inputUrl = MutableStateFlow("")
     private val message = MutableStateFlow<UiMessage?>(null)
-    private val createLocalJob = CreateLocalJobUseCase(jobs)
 
     val uiState = combine(
         inputUrl,
@@ -57,15 +59,15 @@ class MainViewModel(
         message.value = null
     }
 
-    fun createFoundationJob(onSuccess: () -> Unit) {
+    fun analyzeDirect(onSuccess: (String) -> Unit) {
         viewModelScope.launch {
-            createLocalJob(inputUrl.value, BuildConfig.VERSION_NAME)
-                .onSuccess {
+            createDirectDownload(inputUrl.value)
+                .onSuccess { jobId ->
                     inputUrl.value = ""
-                    message.value = null
-                    onSuccess()
+                    message.value = UiMessage.DOWNLOAD_QUEUED
+                    onSuccess(jobId)
                 }
-                .onFailure { message.value = UiMessage.INVALID_URL }
+                .onFailure { message.value = UiMessage.ANALYZE_FAILED }
         }
     }
 
@@ -104,8 +106,13 @@ class MainViewModel(
                     jobs = container.downloadJobRepository,
                     settings = container.settingsRepository,
                     storage = container.storageGateway,
+                    createDirectDownload = CreateDirectDownloadUseCase(
+                        jobs = container.downloadJobRepository,
+                        requests = container.downloadRequestRepository,
+                        probe = container.directMediaProbe,
+                        appVersion = BuildConfig.VERSION_NAME,
+                    ),
                 ) as T
             }
     }
 }
-

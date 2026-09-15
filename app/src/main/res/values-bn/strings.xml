@@ -61,5 +61,16 @@
     <string name="choose_folder">ফোল্ডার বাছুন</string>
     <string name="folder_saved">Download folder সংরক্ষিত হয়েছে</string>
     <string name="folder_error">Folderটি সংরক্ষণ করা যায়নি। অন্য folder বাছুন।</string>
+    <string name="direct_analyze_failed">লিংকটি সরাসরি public audio/video file নয়, অথবা server এটি গ্রহণ করেনি। Supported page-এর জন্য extractor প্রয়োজন।</string>
+    <string name="download_queued">Download queue-তে যোগ হয়েছে।</string>
+    <string name="quick_analyze_title">Analyze করার link বেছে নিন</string>
+    <string name="open_full_app">সম্পূর্ণ app খুলুন</string>
+    <string name="pause">বিরতি</string>
+    <string name="resume">আবার শুরু</string>
+    <string name="retry">আবার চেষ্টা</string>
+    <string name="cancel">বাতিল</string>
+    <string name="notification_channel_downloads">চলমান download</string>
+    <string name="notification_working">Download চলছে</string>
+    <string name="notification_progress">%1$d%% • %2$s</string>
+    <string name="downloaded_of_total">%2$s-এর মধ্যে %1$s</string>
 </resources>
-

@@ -2,6 +2,9 @@ package com.clickdownloader.app.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.Manifest
+import android.os.Build
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
@@ -56,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -65,6 +69,7 @@ import com.clickdownloader.app.MainUiState
 import com.clickdownloader.app.MainViewModel
 import com.clickdownloader.app.R
 import com.clickdownloader.app.UiMessage
+import com.clickdownloader.app.download.DownloadService
 import com.clickdownloader.core.model.AppLanguage
 import com.clickdownloader.core.model.AppThemeMode
 import com.clickdownloader.core.model.DownloadJob
@@ -91,6 +96,7 @@ fun ClickDownloaderApp(
     val currentDestination = backStackEntry?.destination
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     LaunchedEffect(state.settings.language) {
         val tags = when (state.settings.language) {
@@ -105,6 +111,8 @@ fun ClickDownloaderApp(
         stringResource(
             when (message) {
                 UiMessage.INVALID_URL -> R.string.invalid_url
+                UiMessage.ANALYZE_FAILED -> R.string.direct_analyze_failed
+                UiMessage.DOWNLOAD_QUEUED -> R.string.download_queued
                 UiMessage.FOLDER_SAVED -> R.string.folder_saved
                 UiMessage.FOLDER_ERROR -> R.string.folder_error
             },
@@ -149,13 +157,23 @@ fun ClickDownloaderApp(
                     onUrlChanged = viewModel::setInputUrl,
                     onPaste = { viewModel.setInputUrl(readClipboardText(context)) },
                     onAnalyze = {
-                        viewModel.createFoundationJob {
+                        if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        viewModel.analyzeDirect {
+                            DownloadService.start(context)
                             navController.navigate(Destination.DOWNLOADS.route)
                         }
                     },
                 )
             }
-            composable(Destination.DOWNLOADS.route) { DownloadsScreen(state.jobs) }
+            composable(Destination.DOWNLOADS.route) {
+                DownloadsScreen(
+                    jobs = state.jobs,
+                    onPause = { sendDownloadAction(context, DownloadService.ACTION_PAUSE, it) },
+                    onResume = { sendDownloadAction(context, DownloadService.ACTION_RESUME, it) },
+                    onRetry = { sendDownloadAction(context, DownloadService.ACTION_RETRY, it) },
+                    onCancel = { sendDownloadAction(context, DownloadService.ACTION_CANCEL, it) },
+                )
+            }
             composable(Destination.LIBRARY.route) { LibraryScreen() }
             composable(Destination.SETTINGS.route) {
                 SettingsScreen(
@@ -240,7 +258,13 @@ private enum class DownloadTab(val labelRes: Int) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DownloadsScreen(jobs: List<DownloadJob>) {
+private fun DownloadsScreen(
+    jobs: List<DownloadJob>,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onCancel: (String) -> Unit,
+) {
     var selectedTab by remember { mutableStateOf(DownloadTab.ACTIVE) }
     val filtered = jobs.filter { job ->
         when (selectedTab) {
@@ -271,7 +295,21 @@ private fun DownloadsScreen(jobs: List<DownloadJob>) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(filtered, key = { it.id }) { JobCard(it) }
+                items(filtered, key = { it.id }) {
+                    JobCard(it)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        when (it.state) {
+                            DownloadJobState.DOWNLOADING_VIDEO, DownloadJobState.DOWNLOADING_AUDIO ->
+                                OutlinedButton(onClick = { onPause(it.id) }) { Text(stringResource(R.string.pause)) }
+                            DownloadJobState.PAUSED, DownloadJobState.WAITING_FOR_NETWORK ->
+                                OutlinedButton(onClick = { onResume(it.id) }) { Text(stringResource(R.string.resume)) }
+                            DownloadJobState.FAILED, DownloadJobState.RETRY_SCHEDULED, DownloadJobState.LINK_EXPIRED ->
+                                OutlinedButton(onClick = { onRetry(it.id) }) { Text(stringResource(R.string.retry)) }
+                            else -> Unit
+                        }
+                        if (!it.state.isTerminal) OutlinedButton(onClick = { onCancel(it.id) }) { Text(stringResource(R.string.cancel)) }
+                    }
+                }
             }
         }
     }
@@ -414,8 +452,29 @@ private fun JobCard(job: DownloadJob) {
             Text(job.displayTitle, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(job.sourceUrl, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(jobStateLabel(job.state), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+            val total = job.totalBytes
+            if (total != null && total > 0) {
+                Text(stringResource(R.string.downloaded_of_total, humanSize(job.downloadedBytes), humanSize(total)))
+            } else if (job.downloadedBytes > 0) {
+                Text(humanSize(job.downloadedBytes))
+            }
+            job.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
     }
+}
+
+private fun sendDownloadAction(context: Context, action: String, jobId: String) {
+    ContextCompat.startForegroundService(
+        context,
+        Intent(context, DownloadService::class.java).setAction(action).putExtra(DownloadService.EXTRA_JOB_ID, jobId),
+    )
+}
+
+private fun humanSize(bytes: Long): String = when {
+    bytes >= 1_073_741_824 -> "%.2f GB".format(bytes / 1_073_741_824.0)
+    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
+    bytes >= 1_024 -> "%.1f KB".format(bytes / 1_024.0)
+    else -> "$bytes B"
 }
 
 @Composable

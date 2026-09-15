@@ -11,6 +11,8 @@ All dependency versions are exact and centralized in `gradle/libs.versions.toml`
 | Kotlin coroutines | Asynchronous work and Flow | Apache-2.0 |
 | JUnit 4 | Local tests | Eclipse Public License 1.0 |
 | AndroidX Test / Espresso | Instrumented UI tests | Apache-2.0 |
+| OkHttp / MockWebServer | HTTP probing, resumable transfer and deterministic transfer tests | Apache-2.0 |
+| AndroidX WorkManager | Network-constrained delayed retries and restart recovery | Apache-2.0 |
+| AndroidX DocumentFile | User-selected SAF destination finalization | Apache-2.0 |
 
-No extractor, Python runtime, FFmpeg binary, media codec bundle, analytics SDK or advertising SDK is included in Phase 1.
-
+No extractor, Python runtime, FFmpeg binary, media codec bundle, analytics SDK or advertising SDK is included through Phase 2.

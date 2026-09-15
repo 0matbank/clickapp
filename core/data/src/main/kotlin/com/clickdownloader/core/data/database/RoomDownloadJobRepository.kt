@@ -16,6 +16,16 @@ class RoomDownloadJobRepository(
     override suspend fun upsert(job: DownloadJob) = dao.upsert(job.asEntity())
 
     override suspend fun findById(id: String): DownloadJob? = dao.findById(id)?.asExternalModel()
+
+    override suspend fun updateState(id: String, state: DownloadJobState, errorCode: String?, errorMessage: String?) {
+        dao.updateState(id, state.name, errorCode, errorMessage, System.currentTimeMillis())
+    }
+
+    override suspend fun updateProgress(id: String, downloadedBytes: Long, totalBytes: Long?) {
+        dao.updateProgress(id, downloadedBytes, totalBytes, System.currentTimeMillis())
+    }
+
+    override suspend fun recoverInterruptedJobs() = dao.recoverInterruptedJobs(System.currentTimeMillis())
 }
 
 internal fun DownloadJob.asEntity() = DownloadJobEntity(
@@ -49,4 +59,3 @@ internal fun DownloadJobEntity.asExternalModel() = DownloadJob(
     appVersion = appVersion,
     engineVersion = engineVersion,
 )
-

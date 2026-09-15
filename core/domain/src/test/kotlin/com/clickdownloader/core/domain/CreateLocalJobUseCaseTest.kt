@@ -49,5 +49,14 @@ private class FakeJobRepository : DownloadJobRepository {
     }
 
     override suspend fun findById(id: String): DownloadJob? = jobs.value.find { it.id == id }
-}
 
+    override suspend fun updateState(id: String, state: DownloadJobState, errorCode: String?, errorMessage: String?) {
+        jobs.value = jobs.value.map { if (it.id == id) it.copy(state = state, errorCode = errorCode, errorMessage = errorMessage) else it }
+    }
+
+    override suspend fun updateProgress(id: String, downloadedBytes: Long, totalBytes: Long?) {
+        jobs.value = jobs.value.map { if (it.id == id) it.copy(downloadedBytes = downloadedBytes, totalBytes = totalBytes) else it }
+    }
+
+    override suspend fun recoverInterruptedJobs() = Unit
+}

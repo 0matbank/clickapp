@@ -164,3 +164,32 @@ data class ErrorSummaryEntity(
     val occurredAtEpochMillis: Long,
 )
 
+@Entity(
+    tableName = "download_requests",
+    foreignKeys = [ForeignKey(
+        entity = DownloadJobEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["jobId"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+    indices = [Index("jobId", unique = true), Index(value = ["priority", "queuePosition"])],
+)
+data class DownloadRequestEntity(
+    @androidx.room.PrimaryKey val jobId: String,
+    val url: String,
+    val displayName: String,
+    val mimeType: String?,
+    val kind: String,
+    val expectedBytes: Long?,
+    val etag: String?,
+    val lastModified: String?,
+    val temporaryPath: String?,
+    val outputUri: String?,
+    val supportsRanges: Boolean?,
+    val priority: Int,
+    val queuePosition: Long,
+    val attempt: Int,
+    val maxAttempts: Int,
+    val duplicatePolicy: String,
+    val partialFilePolicy: String,
+)
