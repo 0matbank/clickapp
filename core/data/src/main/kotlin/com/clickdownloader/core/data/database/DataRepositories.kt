@@ -6,6 +6,7 @@ import com.clickdownloader.core.domain.DownloadJobRepository
 import com.clickdownloader.core.domain.DownloadRequestRepository
 import com.clickdownloader.core.domain.OutputFileRepository
 import com.clickdownloader.core.domain.ExtractionRepository
+import com.clickdownloader.core.domain.FragmentCheckpointRepository
 
 object DataRepositories {
     @Volatile
@@ -31,4 +32,7 @@ object DataRepositories {
 
     fun createExtractionRepository(context: Context): ExtractionRepository =
         RoomExtractionRepository(database(context).extractionDao())
+
+    fun createFragmentCheckpointRepository(context: Context): FragmentCheckpointRepository =
+        RoomFragmentCheckpointRepository(database(context).fragmentCheckpointDao())
 }

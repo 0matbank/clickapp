@@ -61,3 +61,12 @@ interface ExtractionDao {
     @Query("SELECT * FROM selected_formats WHERE jobId = :jobId LIMIT 1")
     suspend fun findSelectedFormat(jobId: String): SelectedFormatEntity?
 }
+
+@Dao
+interface FragmentCheckpointDao {
+    @Upsert
+    suspend fun upsert(checkpoint: FragmentStateEntity)
+
+    @Query("DELETE FROM fragment_states WHERE jobId = :jobId")
+    suspend fun deleteForJob(jobId: String)
+}

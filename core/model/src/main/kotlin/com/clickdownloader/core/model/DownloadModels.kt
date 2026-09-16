@@ -72,3 +72,23 @@ class DirectDownloadException(
     message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause)
+
+data class FragmentCheckpoint(
+    val jobId: String,
+    val trackId: String,
+    val fragmentIndex: Long,
+    val downloadedBytes: Long,
+    val temporaryPath: String,
+    val completed: Boolean,
+)
+
+data class MediaProcessProgress(
+    val percent: Float,
+    val etaSeconds: Long,
+    val line: String,
+)
+
+data class ProcessedMediaArtifact(
+    val path: String,
+    val sidecarPaths: List<String> = emptyList(),
+)

@@ -23,5 +23,6 @@ include(
     ":core:data",
     ":core:download",
     ":core:extractor",
+    ":core:media",
     ":core:storage",
 )

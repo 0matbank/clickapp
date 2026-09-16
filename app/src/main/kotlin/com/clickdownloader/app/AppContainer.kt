@@ -9,6 +9,8 @@ import com.clickdownloader.core.domain.OutputFileRepository
 import com.clickdownloader.core.domain.DownloadFinalizer
 import com.clickdownloader.core.domain.ExtractionRepository
 import com.clickdownloader.core.domain.MediaExtractor
+import com.clickdownloader.core.domain.AdaptiveMediaProcessor
+import com.clickdownloader.core.domain.FragmentCheckpointRepository
 import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.domain.StorageGateway
 import com.clickdownloader.core.storage.AndroidStorageGateway
@@ -16,6 +18,7 @@ import com.clickdownloader.core.storage.AndroidDownloadFinalizer
 import com.clickdownloader.core.download.DirectMediaProbe
 import com.clickdownloader.core.download.HttpDirectDownloader
 import com.clickdownloader.core.extractor.YtDlpExtractor
+import com.clickdownloader.core.media.YtDlpAdaptiveMediaProcessor
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
@@ -44,6 +47,12 @@ class AppContainer(context: Context) {
     }
 
     val mediaExtractor: MediaExtractor by lazy { YtDlpExtractor(appContext) }
+
+    val fragmentCheckpointRepository: FragmentCheckpointRepository by lazy {
+        DataRepositories.createFragmentCheckpointRepository(appContext)
+    }
+
+    val adaptiveMediaProcessor: AdaptiveMediaProcessor by lazy { YtDlpAdaptiveMediaProcessor(appContext) }
 
     val storageGateway: StorageGateway by lazy {
         AndroidStorageGateway(appContext)

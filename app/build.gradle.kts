@@ -11,8 +11,8 @@ android {
         applicationId = "com.clickdownloader.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -57,6 +57,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:download"))
     implementation(project(":core:extractor"))
+    implementation(project(":core:media"))
     implementation(project(":core:storage"))
 
     implementation(platform(libs.compose.bom))

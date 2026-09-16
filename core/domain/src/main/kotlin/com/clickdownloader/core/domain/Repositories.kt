@@ -10,6 +10,10 @@ import com.clickdownloader.core.model.FinalizedFile
 import com.clickdownloader.core.model.MediaAnalysis
 import com.clickdownloader.core.model.MediaMetadata
 import com.clickdownloader.core.model.SelectedFormat
+import com.clickdownloader.core.model.FragmentCheckpoint
+import com.clickdownloader.core.model.MediaProcessProgress
+import com.clickdownloader.core.model.ProcessedMediaArtifact
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 
 interface DownloadJobRepository {
@@ -43,6 +47,24 @@ interface ExtractionRepository {
     suspend fun saveMetadata(metadata: MediaMetadata)
     suspend fun saveSelectedFormat(format: SelectedFormat)
     suspend fun findSelectedFormat(jobId: String): SelectedFormat?
+}
+
+interface FragmentCheckpointRepository {
+    suspend fun save(checkpoint: FragmentCheckpoint)
+    suspend fun clear(jobId: String)
+}
+
+interface AdaptiveMediaProcessor {
+    suspend fun process(
+        jobId: String,
+        sourceUrl: String,
+        exactFormatSpec: String,
+        workingDirectory: File,
+        preferredContainer: String?,
+        onProgress: suspend (MediaProcessProgress) -> Unit,
+        onCheckpoint: suspend (FragmentCheckpoint) -> Unit,
+    ): ProcessedMediaArtifact
+    fun cancel(jobId: String): Boolean
 }
 
 interface SettingsRepository {

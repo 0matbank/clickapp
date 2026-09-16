@@ -25,4 +25,5 @@ abstract class ClickDownloaderDatabase : RoomDatabase() {
     abstract fun downloadRequestDao(): DownloadRequestDao
     abstract fun outputFileDao(): OutputFileDao
     abstract fun extractionDao(): ExtractionDao
+    abstract fun fragmentCheckpointDao(): FragmentCheckpointDao
 }

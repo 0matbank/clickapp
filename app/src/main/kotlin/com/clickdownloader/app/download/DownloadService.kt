@@ -15,8 +15,10 @@ import com.clickdownloader.core.model.DirectDownloadException
 import com.clickdownloader.core.model.DirectDownloadFailure
 import com.clickdownloader.core.model.DownloadControl
 import com.clickdownloader.core.model.DownloadJobState
+import com.clickdownloader.core.model.DownloadKind
 import com.clickdownloader.core.model.DownloadProgress
 import com.clickdownloader.core.model.PartialFilePolicy
+import com.clickdownloader.core.media.MediaArtifactVerifier
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -98,26 +100,67 @@ class DownloadService : Service() {
         val downloadState = if (request.mimeType?.startsWith("audio/") == true) DownloadJobState.DOWNLOADING_AUDIO else DownloadJobState.DOWNLOADING_VIDEO
         jobs.updateState(job.id, downloadState)
         try {
-            val result = container.directDownloader.download(
-                request = request,
-                partialFile = partial,
-                control = { control.get() },
-                onProgress = { progress ->
-                    jobs.updateProgress(job.id, progress.downloadedBytes, progress.totalBytes)
-                    foreground(job.id, job.displayTitle, downloadState, progress)
-                },
-            )
+            val artifactFile: File
+            val verifiedSize: Long
+            val sidecars: List<String>
+            if (request.kind == DownloadKind.DIRECT) {
+                val result = container.directDownloader.download(
+                    request = request,
+                    partialFile = partial,
+                    control = { control.get() },
+                    onProgress = { progress ->
+                        jobs.updateProgress(job.id, progress.downloadedBytes, progress.totalBytes)
+                        foreground(job.id, job.displayTitle, downloadState, progress)
+                    },
+                )
+                artifactFile = result.file
+                verifiedSize = DirectFileVerifier.verify(result.file, result.totalBytes)
+                sidecars = emptyList()
+            } else {
+                val selected = container.extractionRepository.findSelectedFormat(job.id)
+                    ?: throw DirectDownloadException(DirectDownloadFailure.VERIFICATION, "The exact selected format is missing")
+                jobs.updateState(job.id, DownloadJobState.DOWNLOADING_FRAGMENTS)
+                val workDirectory = File(filesDir, "adaptive/${job.id}")
+                var merging = false
+                val artifact = container.adaptiveMediaProcessor.process(
+                    jobId = job.id,
+                    sourceUrl = job.sourceUrl,
+                    exactFormatSpec = selected.formatId,
+                    workingDirectory = workDirectory,
+                    preferredContainer = selected.container,
+                    onProgress = { mediaProgress ->
+                        when (control.get()) {
+                            DownloadControl.Pause, DownloadControl.Cancel -> container.adaptiveMediaProcessor.cancel(job.id)
+                            DownloadControl.Continue -> Unit
+                        }
+                        val bytes = request.expectedBytes?.let { (it * mediaProgress.percent / 100f).toLong() } ?: 0L
+                        jobs.updateProgress(job.id, bytes, request.expectedBytes)
+                        if (mediaProgress.line.contains("Merger", true) || mediaProgress.line.contains("ffmpeg", true)) merging = true
+                        val currentState = if (merging) DownloadJobState.MERGING else DownloadJobState.DOWNLOADING_FRAGMENTS
+                        jobs.updateState(job.id, currentState)
+                        foreground(job.id, job.displayTitle, currentState, DownloadProgress(bytes, request.expectedBytes, 0))
+                    },
+                    onCheckpoint = container.fragmentCheckpointRepository::save,
+                )
+                artifactFile = File(artifact.path)
+                MediaArtifactVerifier.verify(artifactFile, selected)
+                verifiedSize = artifactFile.length()
+                sidecars = artifact.sidecarPaths
+            }
             jobs.updateState(job.id, DownloadJobState.VERIFYING)
             foreground(job.id, job.displayTitle, DownloadJobState.VERIFYING)
-            val verifiedSize = DirectFileVerifier.verify(result.file, result.totalBytes)
             val finalized = container.downloadFinalizer.finalizeFromTemporary(
-                result.file.absolutePath,
+                artifactFile.absolutePath,
                 request.displayName,
                 request.mimeType ?: "application/octet-stream",
             ).getOrElse { throw DirectDownloadException(DirectDownloadFailure.STORAGE, it.message ?: "Storage finalization failed", it) }
             require(finalized.sizeBytes == verifiedSize) { "Final output size changed during finalization" }
             container.outputFileRepository.add(job.id, finalized, verified = true)
             container.downloadRequestRepository.upsert(request.copy(outputUri = finalized.uri))
+            if (request.kind != DownloadKind.DIRECT) {
+                container.fragmentCheckpointRepository.clear(job.id)
+                sidecars.map(::File).forEach { it.delete() }
+            }
             jobs.updateState(job.id, DownloadJobState.COMPLETED)
             DownloadNotifications.post(this, job.id.hashCode(), DownloadNotifications.build(this, job.id, job.displayTitle, DownloadJobState.COMPLETED))
         } catch (error: DirectDownloadException) {
@@ -130,7 +173,11 @@ class DownloadService : Service() {
                 DownloadControl.Continue -> handleFailure(request, error)
             }
         } catch (error: Throwable) {
-            handleFailure(request, DirectDownloadException(DirectDownloadFailure.VERIFICATION, error.message ?: "Verification failed", error))
+            when (control.get()) {
+                DownloadControl.Pause -> jobs.updateState(job.id, DownloadJobState.PAUSED)
+                DownloadControl.Cancel -> jobs.updateState(job.id, DownloadJobState.CANCELLED)
+                DownloadControl.Continue -> handleFailure(request, classifyProcessingFailure(error))
+            }
         } finally {
             activeJobId.compareAndSet(job.id, null)
         }
@@ -152,6 +199,19 @@ class DownloadService : Service() {
             container.downloadRequestRepository.upsert(next)
             RecoveryWorker.schedule(this, retryPolicy.delayMillis(next.attempt), request.jobId)
         }
+    }
+
+    private fun classifyProcessingFailure(error: Throwable): DirectDownloadException {
+        val message = error.message ?: "Media processing failed"
+        val lower = message.lowercase()
+        val failure = when {
+            "401" in lower || "login" in lower || "authentication" in lower -> DirectDownloadFailure.AUTH_REQUIRED
+            "403" in lower || "410" in lower || "expired" in lower -> DirectDownloadFailure.LINK_EXPIRED
+            "429" in lower || "rate limit" in lower -> DirectDownloadFailure.RATE_LIMITED
+            "network" in lower || "timed out" in lower || "connection" in lower || "unable to download" in lower -> DirectDownloadFailure.NETWORK
+            else -> DirectDownloadFailure.VERIFICATION
+        }
+        return DirectDownloadException(failure, message, error)
     }
 
     private fun foreground(jobId: String, title: String, state: DownloadJobState, progress: DownloadProgress? = null) {

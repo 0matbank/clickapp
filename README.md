@@ -25,6 +25,16 @@ Phase 3 — Extractor and Source Format Selection is complete:
 - Exact selected format ID (or explicit `video+audio` IDs), source URLs and required request headers persisted before queueing
 - DRM formats shown but disabled; no DRM bypass and no silent quality or format substitution
 
+Phase 4 — Adaptive Media Pipeline is complete:
+
+- Exact yt-dlp format-spec execution for progressive, HLS and DASH sources
+- Resumable `.part`/fragment transfers with durable per-fragment Room checkpoints
+- Separate video/audio retrieval and bundled FFmpeg stream-copy merge/remux
+- Metadata, thumbnail and available subtitle embedding without video re-encoding
+- Re-extraction from the original page on retry while retaining the exact selected format IDs
+- Android `MediaExtractor` verification of required audio/video tracks and selected dimensions before finalization
+- API 37 generated 1080p and losslessly merged 4K-with-audio verification tests
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:
@@ -40,7 +50,7 @@ Phase 1 — App Foundation:
 - Debug and minified release build types
 - Unit and instrumented-test foundations
 
-Adaptive-stream merging, playlist/live handling and the session browser are introduced in Phases 4–6.
+Playlist/live handling and the session browser are introduced in Phases 5–6.
 
 ## Prerequisites
 
@@ -82,4 +92,4 @@ The app asks for a download directory only when the user selects **Choose folder
 
 ## Known limits
 
-Phase 3 accepts direct media URLs and supported public web pages. Separate audio/video, HLS/DASH, playlists, live streams and authenticated browser sessions are handled by their later phases. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.
+Phase 4 accepts direct media URLs, supported public web pages, separate audio/video sources and HLS/DASH representations. Playlists, live streams and authenticated browser sessions are handled by their later phases. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.

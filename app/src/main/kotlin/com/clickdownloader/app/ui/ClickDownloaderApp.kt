@@ -396,7 +396,7 @@ private fun DownloadsScreen(
                     JobCard(it)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         when (it.state) {
-                            DownloadJobState.DOWNLOADING_VIDEO, DownloadJobState.DOWNLOADING_AUDIO ->
+                            DownloadJobState.DOWNLOADING_VIDEO, DownloadJobState.DOWNLOADING_AUDIO, DownloadJobState.DOWNLOADING_FRAGMENTS, DownloadJobState.MERGING ->
                                 OutlinedButton(onClick = { onPause(it.id) }) { Text(stringResource(R.string.pause)) }
                             DownloadJobState.PAUSED, DownloadJobState.WAITING_FOR_NETWORK ->
                                 OutlinedButton(onClick = { onResume(it.id) }) { Text(stringResource(R.string.resume)) }
