@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,6 +79,7 @@ import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.DownloadJobState
 import com.clickdownloader.core.model.FormatCompatibility
 import com.clickdownloader.core.model.MediaFormatOption
+import com.clickdownloader.core.extractor.BatchQualityRule
 
 private enum class Destination(
     val route: String,
@@ -116,6 +119,7 @@ fun ClickDownloaderApp(
                 UiMessage.INVALID_URL -> R.string.invalid_url
                 UiMessage.ANALYZE_FAILED -> R.string.direct_analyze_failed
                 UiMessage.DOWNLOAD_QUEUED -> R.string.download_queued
+                UiMessage.BATCH_PARTIAL -> R.string.batch_partial
                 UiMessage.FOLDER_SAVED -> R.string.folder_saved
                 UiMessage.FOLDER_ERROR -> R.string.folder_error
             },
@@ -179,15 +183,27 @@ fun ClickDownloaderApp(
                         }
                     },
                     onBackToFormats = viewModel::backToFormats,
+                    onPlaylistItemToggled = viewModel::togglePlaylistItem,
+                    onBatchRuleSelected = viewModel::setBatchRule,
+                    onPrepareBatch = viewModel::prepareBatch,
+                    onConfirmBatch = {
+                        viewModel.confirmBatch {
+                            DownloadService.start(context)
+                            navController.navigate(Destination.DOWNLOADS.route)
+                        }
+                    },
+                    onDismissBatch = viewModel::dismissBatchConfirmation,
                 )
             }
             composable(Destination.DOWNLOADS.route) {
                 DownloadsScreen(
                     jobs = state.jobs,
+                    liveJobIds = state.liveJobIds,
                     onPause = { sendDownloadAction(context, DownloadService.ACTION_PAUSE, it) },
                     onResume = { sendDownloadAction(context, DownloadService.ACTION_RESUME, it) },
                     onRetry = { sendDownloadAction(context, DownloadService.ACTION_RETRY, it) },
                     onCancel = { sendDownloadAction(context, DownloadService.ACTION_CANCEL, it) },
+                    onFinalizeLive = { sendDownloadAction(context, DownloadService.ACTION_FINALIZE_LIVE, it) },
                 )
             }
             composable(Destination.LIBRARY.route) { LibraryScreen() }
@@ -219,6 +235,11 @@ private fun HomeScreen(
     onFormatSelected: (MediaFormatOption) -> Unit,
     onAudioSelected: (MediaFormatOption) -> Unit,
     onBackToFormats: () -> Unit,
+    onPlaylistItemToggled: (String) -> Unit,
+    onBatchRuleSelected: (BatchQualityRule) -> Unit,
+    onPrepareBatch: () -> Unit,
+    onConfirmBatch: () -> Unit,
+    onDismissBatch: () -> Unit,
 ) {
     val active = state.jobs.firstOrNull { !it.state.isTerminal && it.state != DownloadJobState.FAILED }
     LazyColumn(
@@ -262,10 +283,49 @@ private fun HomeScreen(
         state.pendingSelection?.let { pending ->
             item {
                 Text(pending.analysis.metadata.title, style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(R.string.source_formats_count, pending.analysis.formats.size))
+                if (pending.analysis.isPlaylist) {
+                    Text(stringResource(R.string.playlist_items_count, pending.analysis.playlistItems.size))
+                } else {
+                    Text(stringResource(R.string.source_formats_count, pending.analysis.formats.size))
+                }
             }
             val selectedVideo = state.selectedVideo
-            if (selectedVideo == null) {
+            if (pending.analysis.isPlaylist) {
+                item {
+                    Text(stringResource(R.string.batch_quality_rule), style = MaterialTheme.typography.titleMedium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(BatchQualityRule.entries) { rule ->
+                            FilterChip(
+                                selected = state.batchRule == rule,
+                                onClick = { onBatchRuleSelected(rule) },
+                                label = { Text(batchRuleLabel(rule)) },
+                            )
+                        }
+                    }
+                }
+                items(pending.analysis.playlistItems, key = { "playlist-${it.id}" }) { playlistItem ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = playlistItem.id in state.selectedPlaylistIds,
+                                onCheckedChange = { onPlaylistItemToggled(playlistItem.id) },
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(playlistItem.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                playlistItem.durationMillis?.let { Text("${it / 1000}s", style = MaterialTheme.typography.bodySmall) }
+                            }
+                        }
+                    }
+                }
+                item {
+                    Text(stringResource(R.string.batch_rule_disclosure), style = MaterialTheme.typography.bodySmall)
+                    Button(
+                        onClick = onPrepareBatch,
+                        enabled = state.selectedPlaylistIds.isNotEmpty() && !state.isAnalyzing,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.prepare_selected_items, state.selectedPlaylistIds.size)) }
+                }
+            } else if (selectedVideo == null) {
                 val recommendedVideoId = pending.analysis.formats
                     .filter { it.hasVideo && !it.drmProtected && it.compatibility != FormatCompatibility.TRANSCODE_REQUIRED }
                     .maxByOrNull { (it.width ?: 0).toLong() * (it.height ?: 0) * 100 + (it.framesPerSecond ?: 0.0).toLong() }
@@ -302,7 +362,34 @@ private fun HomeScreen(
             item { EmptyJobs() }
         }
     }
+    state.batchPreparation?.let { batch ->
+        AlertDialog(
+            onDismissRequest = onDismissBatch,
+            title = { Text(stringResource(R.string.confirm_batch_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.confirm_batch_body,
+                        batch.items.size,
+                        if (batch.allSizesKnown) humanSize(batch.knownBytes) else stringResource(R.string.size_partly_unknown),
+                        batch.failedItemIds.size,
+                    ),
+                )
+            },
+            confirmButton = { Button(onClick = onConfirmBatch, enabled = batch.items.isNotEmpty()) { Text(stringResource(R.string.confirm_queue)) } },
+            dismissButton = { OutlinedButton(onClick = onDismissBatch) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
 }
+
+@Composable
+private fun batchRuleLabel(rule: BatchQualityRule): String = stringResource(
+    when (rule) {
+        BatchQualityRule.BEST_SOURCE_WITH_AUDIO -> R.string.batch_best_source
+        BatchQualityRule.BEST_MUXED -> R.string.batch_best_muxed
+        BatchQualityRule.AUDIO_ONLY -> R.string.batch_audio_only
+    },
+)
 
 @Composable
 private fun FormatCard(format: MediaFormatOption, recommended: Boolean, onClick: () -> Unit) {
@@ -357,17 +444,19 @@ private enum class DownloadTab(val labelRes: Int) {
 @Composable
 private fun DownloadsScreen(
     jobs: List<DownloadJob>,
+    liveJobIds: Set<String>,
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onRetry: (String) -> Unit,
     onCancel: (String) -> Unit,
+    onFinalizeLive: (String) -> Unit,
 ) {
     var selectedTab by remember { mutableStateOf(DownloadTab.ACTIVE) }
     val filtered = jobs.filter { job ->
         when (selectedTab) {
             DownloadTab.ACTIVE -> job.state !in setOf(DownloadJobState.QUEUED, DownloadJobState.COMPLETED, DownloadJobState.FAILED, DownloadJobState.CANCELLED)
             DownloadTab.QUEUE -> job.state == DownloadJobState.QUEUED
-            DownloadTab.COMPLETED -> job.state == DownloadJobState.COMPLETED
+            DownloadTab.COMPLETED -> job.state == DownloadJobState.COMPLETED || job.state == DownloadJobState.PLAYLIST_QUEUED
             DownloadTab.FAILED -> job.state == DownloadJobState.FAILED || job.state == DownloadJobState.CANCELLED
         }
     }
@@ -397,7 +486,11 @@ private fun DownloadsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         when (it.state) {
                             DownloadJobState.DOWNLOADING_VIDEO, DownloadJobState.DOWNLOADING_AUDIO, DownloadJobState.DOWNLOADING_FRAGMENTS, DownloadJobState.MERGING ->
-                                OutlinedButton(onClick = { onPause(it.id) }) { Text(stringResource(R.string.pause)) }
+                                if (it.id in liveJobIds) {
+                                    OutlinedButton(onClick = { onFinalizeLive(it.id) }) { Text(stringResource(R.string.stop_and_save)) }
+                                } else {
+                                    OutlinedButton(onClick = { onPause(it.id) }) { Text(stringResource(R.string.pause)) }
+                                }
                             DownloadJobState.PAUSED, DownloadJobState.WAITING_FOR_NETWORK ->
                                 OutlinedButton(onClick = { onResume(it.id) }) { Text(stringResource(R.string.resume)) }
                             DownloadJobState.FAILED, DownloadJobState.RETRY_SCHEDULED, DownloadJobState.LINK_EXPIRED ->
@@ -588,6 +681,7 @@ private fun jobStateLabel(state: DownloadJobState): String = stringResource(
         DownloadJobState.MERGING -> R.string.job_merging
         DownloadJobState.OPTIONAL_CONVERSION -> R.string.job_converting
         DownloadJobState.VERIFYING -> R.string.job_verifying
+        DownloadJobState.PLAYLIST_QUEUED -> R.string.job_playlist_queued
         DownloadJobState.COMPLETED -> R.string.job_completed
         DownloadJobState.PAUSED -> R.string.job_paused
         DownloadJobState.WAITING_FOR_NETWORK -> R.string.job_waiting_network

@@ -10,6 +10,20 @@ import org.junit.Test
 
 class YtDlpJsonNormalizerTest {
     @Test
+    fun `playlist entries retain selection identity order and source URL`() {
+        val json = ObjectMapper().readTree(
+            """{"_type":"playlist","id":"p1","title":"List","webpage_url":"https://source.test/list","entries":[{"id":"a","title":"One","webpage_url":"https://source.test/a","duration":4},{"id":"b","title":"Two","webpage_url":"https://source.test/b"}]}""",
+        )
+
+        val result = YtDlpJsonNormalizer.normalize(json, "https://source.test/list")
+
+        assertTrue(result.isPlaylist)
+        assertEquals(listOf("a", "b"), result.playlistItems.map { it.id })
+        assertEquals(listOf(0, 1), result.playlistItems.map { it.position })
+        assertEquals(4_000L, result.playlistItems.first().durationMillis)
+    }
+
+    @Test
     fun `normalizer preserves every source format and technical field`() {
         val json = ObjectMapper().readTree(
             """

@@ -13,6 +13,23 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MediaArtifactVerifierTest {
     @Test
+    fun finalizesInterruptedLiveTransportStreamWithoutReencoding() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        FFmpeg.getInstance().init(context)
+        val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        val directory = File(context.cacheDir, "live-finalizer-${System.nanoTime()}").apply { mkdirs() }
+        val partial = File(directory, "live.ts.part")
+        execute(context, ffmpeg, "-f", "lavfi", "-i", "color=size=640x360:rate=2:duration=2", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:v", "mpeg2video", "-c:a", "mp2", "-f", "mpegts", partial.absolutePath)
+
+        val result = LiveStreamFinalizer(context).finalize("live", directory, "mkv")
+        val inspection = MediaArtifactVerifier.verify(File(result.path), selected("live", 640, 360))
+
+        assertTrue(inspection.hasVideo && inspection.hasAudio)
+        directory.listFiles().orEmpty().forEach { it.delete() }
+        directory.delete()
+    }
+
+    @Test
     fun verifies1080pAndLosslesslyMerged4kArtifactsContainAudio() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         FFmpeg.getInstance().init(context)

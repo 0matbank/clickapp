@@ -13,6 +13,7 @@ import com.clickdownloader.core.model.SelectedFormat
 import com.clickdownloader.core.model.FragmentCheckpoint
 import com.clickdownloader.core.model.MediaProcessProgress
 import com.clickdownloader.core.model.ProcessedMediaArtifact
+import com.clickdownloader.core.model.PlaylistItem
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 
@@ -39,8 +40,14 @@ interface OutputFileRepository {
 
 interface MediaExtractor {
     suspend fun analyze(url: String, cookieFilePath: String? = null): MediaAnalysis
+    suspend fun analyzePlaylist(url: String, cookieFilePath: String? = null): MediaAnalysis = analyze(url, cookieFilePath)
     fun cancel(operationId: String): Boolean
     fun engineVersion(): String?
+}
+
+interface PlaylistRepository {
+    suspend fun savePlaylist(id: String, sourceUrl: String, title: String, items: List<PlaylistItem>)
+    suspend fun attachJob(playlistId: String, itemId: String, jobId: String)
 }
 
 interface ExtractionRepository {
@@ -65,6 +72,7 @@ interface AdaptiveMediaProcessor {
         onCheckpoint: suspend (FragmentCheckpoint) -> Unit,
     ): ProcessedMediaArtifact
     fun cancel(jobId: String): Boolean
+    fun requestLiveFinalization(jobId: String): Boolean = false
 }
 
 interface SettingsRepository {

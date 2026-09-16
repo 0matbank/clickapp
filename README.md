@@ -35,6 +35,16 @@ Phase 4 — Adaptive Media Pipeline is complete:
 - Android `MediaExtractor` verification of required audio/video tracks and selected dimensions before finalization
 - API 37 generated 1080p and losslessly merged 4K-with-audio verification tests
 
+Phase 5 — Playlist, Batch and Live is complete:
+
+- Playlist entry discovery with explicit per-item selection
+- Visible batch rules for best original video plus audio, best muxed source, or audio-only
+- Pre-queue storage estimate and confirmation; unknown source sizes remain clearly marked
+- Every selected item is analyzed and queued independently so one extraction or queue failure does not cancel the rest
+- Persistent playlist/item-to-job relationships in Room
+- Non-DRM live capture over supported extractor streams with explicit **Stop & Save**
+- Interrupted MPEG-TS live capture finalized by FFmpeg stream-copy and verified for both video and audio
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:
@@ -50,7 +60,7 @@ Phase 1 — App Foundation:
 - Debug and minified release build types
 - Unit and instrumented-test foundations
 
-Playlist/live handling and the session browser are introduced in Phases 5–6.
+Authenticated browser/session handling is introduced in Phase 6.
 
 ## Prerequisites
 
@@ -92,4 +102,4 @@ The app asks for a download directory only when the user selects **Choose folder
 
 ## Known limits
 
-Phase 4 accepts direct media URLs, supported public web pages, separate audio/video sources and HLS/DASH representations. Playlists, live streams and authenticated browser sessions are handled by their later phases. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.
+Phase 5 accepts direct media URLs, supported public web pages, separate audio/video sources, HLS/DASH representations, supported playlists and non-DRM live streams. A live source can still fail when a site requires authentication, blocks the extractor, expires the manifest, or uses DRM. Authenticated browser sessions are handled by Phase 6. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.

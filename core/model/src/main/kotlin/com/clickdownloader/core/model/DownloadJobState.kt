@@ -12,6 +12,7 @@ enum class DownloadJobState {
     MERGING,
     OPTIONAL_CONVERSION,
     VERIFYING,
+    PLAYLIST_QUEUED,
     COMPLETED,
     PAUSED,
     WAITING_FOR_NETWORK,
@@ -24,7 +25,7 @@ enum class DownloadJobState {
     ;
 
     val isTerminal: Boolean
-        get() = this == COMPLETED || this == CANCELLED
+        get() = this == COMPLETED || this == PLAYLIST_QUEUED || this == CANCELLED
 
     fun canTransitionTo(next: DownloadJobState): Boolean {
         if (next == this) return true
@@ -35,7 +36,7 @@ enum class DownloadJobState {
         return when (this) {
             CREATED -> next == ANALYZING
             ANALYZING -> next == WAITING_FOR_SELECTION
-            WAITING_FOR_SELECTION -> next == QUEUED
+            WAITING_FOR_SELECTION -> next == QUEUED || next == PLAYLIST_QUEUED
             QUEUED -> next == PREPARING
             PREPARING -> next in downloadStates
             DOWNLOADING_VIDEO,
@@ -54,6 +55,7 @@ enum class DownloadJobState {
             FAILED,
             -> next == QUEUED || next == PREPARING || next == ANALYZING
             COMPLETED,
+            PLAYLIST_QUEUED,
             CANCELLED,
             -> false
         }
@@ -87,4 +89,3 @@ enum class DownloadJobState {
         )
     }
 }
-

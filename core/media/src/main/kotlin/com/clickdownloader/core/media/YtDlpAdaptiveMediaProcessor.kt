@@ -9,6 +9,7 @@ import com.clickdownloader.core.model.FragmentCheckpoint
 import com.clickdownloader.core.model.MediaProcessProgress
 import com.clickdownloader.core.model.ProcessedMediaArtifact
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -28,12 +29,20 @@ class YtDlpAdaptiveMediaProcessor(context: Context) : AdaptiveMediaProcessor {
         ensureInitialized()
         workingDirectory.mkdirs()
         val request = YtDlpMediaCommand.build(sourceUrl, exactFormatSpec, workingDirectory, jobId, preferredContainer)
-        YoutubeDL.getInstance().execute(request, jobId) { percent, eta, line ->
-            runBlocking {
-                onProgress(MediaProcessProgress(percent, eta, line))
-                FragmentCheckpointScanner.scan(jobId, exactFormatSpec, workingDirectory).forEach { onCheckpoint(it) }
+        try {
+            YoutubeDL.getInstance().execute(request, jobId) { percent, eta, line ->
+                runBlocking {
+                    onProgress(MediaProcessProgress(percent, eta, line))
+                    FragmentCheckpointScanner.scan(jobId, exactFormatSpec, workingDirectory).forEach { onCheckpoint(it) }
+                }
             }
+        } catch (error: Throwable) {
+            if (liveFinalizationRequests.remove(jobId)) {
+                return@withContext LiveStreamFinalizer(appContext).finalize(jobId, workingDirectory, preferredContainer)
+            }
+            throw error
         }
+        liveFinalizationRequests.remove(jobId)
         val media = workingDirectory.listFiles().orEmpty()
             .filter { it.isFile && it.length() > 0 && it.extension.lowercase() in MEDIA_EXTENSIONS }
             .maxByOrNull(File::lastModified)
@@ -45,6 +54,11 @@ class YtDlpAdaptiveMediaProcessor(context: Context) : AdaptiveMediaProcessor {
     }
 
     override fun cancel(jobId: String): Boolean = YoutubeDL.getInstance().destroyProcessById(jobId)
+
+    override fun requestLiveFinalization(jobId: String): Boolean {
+        liveFinalizationRequests += jobId
+        return YoutubeDL.getInstance().destroyProcessById(jobId)
+    }
 
     @Synchronized
     private fun ensureInitialized() {
@@ -58,6 +72,7 @@ class YtDlpAdaptiveMediaProcessor(context: Context) : AdaptiveMediaProcessor {
     private companion object {
         @Volatile var initialized = false
         val MEDIA_EXTENSIONS = setOf("mp4", "mkv", "webm", "m4a", "mp3", "opus", "ogg", "mov", "ts", "aac", "flac")
+        val liveFinalizationRequests = ConcurrentHashMap.newKeySet<String>()
     }
 }
 
@@ -92,6 +107,7 @@ object YtDlpMediaCommand {
         addOption("--continue")
         addOption("--part")
         addOption("--keep-fragments")
+        addOption("--hls-use-mpegts")
         addOption("--newline")
         addOption("--embed-metadata")
         addOption("--write-thumbnail")
@@ -101,5 +117,29 @@ object YtDlpMediaCommand {
         addOption("--sub-langs", "all")
         addOption("--write-info-json")
         if (preferredContainer in setOf("mp4", "mkv", "webm")) addOption("--merge-output-format", preferredContainer!!)
+    }
+}
+
+class LiveStreamFinalizer(private val context: Context) {
+    fun finalize(jobId: String, directory: File, preferredContainer: String?): ProcessedMediaArtifact {
+        val extension = preferredContainer?.takeIf { it in setOf("mp4", "mkv", "webm") } ?: "mkv"
+        val output = File(directory, "$jobId-live.$extension")
+        val input = directory.listFiles().orEmpty()
+            .filter { it.isFile && it.length() > 0 && it != output && !it.name.endsWith(".json") && it.extension.lowercase() !in setOf("jpg", "jpeg", "png", "webp", "vtt", "srt") }
+            .maxByOrNull(File::length)
+            ?: error("No captured live media is available to finalize")
+        val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        val process = ProcessBuilder(ffmpeg.absolutePath, "-y", "-hide_banner", "-loglevel", "error", "-i", input.absolutePath, "-map", "0", "-c", "copy", output.absolutePath)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["LD_LIBRARY_PATH"] = listOf(
+                    context.applicationInfo.nativeLibraryDir,
+                    File(context.noBackupFilesDir, "youtubedl-android/packages/ffmpeg/usr/lib").absolutePath,
+                ).joinToString(":")
+            }
+            .start()
+        val outputText = process.inputStream.bufferedReader().readText()
+        check(process.waitFor() == 0 && output.length() > 0) { "Live stream finalization failed: $outputText" }
+        return ProcessedMediaArtifact(output.absolutePath, directory.listFiles().orEmpty().filter { it != output }.map(File::getAbsolutePath))
     }
 }

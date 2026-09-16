@@ -83,6 +83,15 @@ data class SubtitleTrack(
     val isAutomatic: Boolean = false,
 )
 
+data class PlaylistItem(
+    val id: String,
+    val sourceUrl: String,
+    val title: String,
+    val position: Int,
+    val durationMillis: Long? = null,
+    val thumbnailUrl: String? = null,
+)
+
 data class MediaAnalysis(
     val metadata: MediaMetadata,
     val formats: List<MediaFormatOption>,
@@ -90,4 +99,5 @@ data class MediaAnalysis(
     val extractorKey: String? = null,
     val webpageUrl: String,
     val isPlaylist: Boolean = false,
+    val playlistItems: List<PlaylistItem> = emptyList(),
 )

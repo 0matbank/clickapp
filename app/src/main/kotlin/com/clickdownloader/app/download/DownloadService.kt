@@ -34,6 +34,7 @@ class DownloadService : Service() {
     private val running = AtomicBoolean(false)
     private val activeJobId = AtomicReference<String?>(null)
     private val control = AtomicReference<DownloadControl>(DownloadControl.Continue)
+    private val activeIsLive = AtomicBoolean(false)
     private val retryPolicy = RetryPolicy()
     private val container by lazy { (application as ClickDownloaderApplication).container }
 
@@ -48,6 +49,7 @@ class DownloadService : Service() {
         when (intent?.action ?: ACTION_START) {
             ACTION_PAUSE -> if (activeJobId.get() == jobId) control.set(DownloadControl.Pause)
             ACTION_CANCEL -> if (activeJobId.get() == jobId) control.set(DownloadControl.Cancel) else jobId?.let { cancelQueued(it) }
+            ACTION_FINALIZE_LIVE -> if (activeJobId.get() == jobId && activeIsLive.get()) jobId?.let(container.adaptiveMediaProcessor::requestLiveFinalization)
             ACTION_RESUME, ACTION_RETRY -> jobId?.let { resume(it) }
             else -> processQueue()
         }
@@ -84,6 +86,7 @@ class DownloadService : Service() {
         val jobs = container.downloadJobRepository
         val job = jobs.findById(request.jobId) ?: return
         activeJobId.set(job.id)
+        activeIsLive.set(request.kind == DownloadKind.LIVE)
         control.set(DownloadControl.Continue)
         jobs.updateState(job.id, DownloadJobState.PREPARING)
         foreground(job.id, job.displayTitle, DownloadJobState.PREPARING)
@@ -180,6 +183,7 @@ class DownloadService : Service() {
             }
         } finally {
             activeJobId.compareAndSet(job.id, null)
+            activeIsLive.set(false)
         }
     }
 
@@ -218,7 +222,7 @@ class DownloadService : Service() {
         ServiceCompat.startForeground(
             this,
             DownloadNotifications.FOREGROUND_ID,
-            DownloadNotifications.build(this, jobId, title, state, progress),
+            DownloadNotifications.build(this, jobId, title, state, progress, isLive = activeIsLive.get()),
             if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
         )
     }
@@ -242,6 +246,7 @@ class DownloadService : Service() {
         const val ACTION_RESUME = "com.clickdownloader.action.RESUME"
         const val ACTION_RETRY = "com.clickdownloader.action.RETRY"
         const val ACTION_CANCEL = "com.clickdownloader.action.CANCEL"
+        const val ACTION_FINALIZE_LIVE = "com.clickdownloader.action.FINALIZE_LIVE"
         const val EXTRA_JOB_ID = "job_id"
 
         fun start(context: Context) {

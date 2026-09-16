@@ -11,6 +11,7 @@ import com.clickdownloader.core.domain.ExtractionRepository
 import com.clickdownloader.core.domain.MediaExtractor
 import com.clickdownloader.core.domain.AdaptiveMediaProcessor
 import com.clickdownloader.core.domain.FragmentCheckpointRepository
+import com.clickdownloader.core.domain.PlaylistRepository
 import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.domain.StorageGateway
 import com.clickdownloader.core.storage.AndroidStorageGateway
@@ -50,6 +51,10 @@ class AppContainer(context: Context) {
 
     val fragmentCheckpointRepository: FragmentCheckpointRepository by lazy {
         DataRepositories.createFragmentCheckpointRepository(appContext)
+    }
+
+    val playlistRepository: PlaylistRepository by lazy {
+        DataRepositories.createPlaylistRepository(appContext)
     }
 
     val adaptiveMediaProcessor: AdaptiveMediaProcessor by lazy { YtDlpAdaptiveMediaProcessor(appContext) }

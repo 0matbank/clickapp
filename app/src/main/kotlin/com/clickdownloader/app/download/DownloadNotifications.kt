@@ -36,6 +36,7 @@ object DownloadNotifications {
         title: String,
         state: DownloadJobState,
         progress: DownloadProgress? = null,
+        isLive: Boolean = false,
     ): Notification {
         val open = PendingIntent.getActivity(
             context,
@@ -58,7 +59,11 @@ object DownloadNotifications {
             builder.setProgress(0, 0, true)
         }
         if (state in setOf(DownloadJobState.DOWNLOADING_VIDEO, DownloadJobState.DOWNLOADING_AUDIO, DownloadJobState.DOWNLOADING_FRAGMENTS, DownloadJobState.MERGING)) {
-            builder.addAction(0, context.getString(R.string.pause), action(context, DownloadService.ACTION_PAUSE, jobId, 20))
+            if (isLive) {
+                builder.addAction(0, context.getString(R.string.stop_and_save), action(context, DownloadService.ACTION_FINALIZE_LIVE, jobId, 24))
+            } else {
+                builder.addAction(0, context.getString(R.string.pause), action(context, DownloadService.ACTION_PAUSE, jobId, 20))
+            }
             builder.addAction(0, context.getString(R.string.cancel), action(context, DownloadService.ACTION_CANCEL, jobId, 21))
         } else if (state == DownloadJobState.PAUSED) {
             builder.addAction(0, context.getString(R.string.resume), action(context, DownloadService.ACTION_RESUME, jobId, 22))

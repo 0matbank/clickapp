@@ -80,4 +80,18 @@
     <string name="select_video_then_audio">ভিডিও, তারপর অডিও বাছুন</string>
     <string name="download_exact_format">এই নির্দিষ্ট ফরম্যাট ডাউনলোড করুন</string>
     <string name="recommended_for_device">এই ডিভাইসের জন্য প্রস্তাবিত</string>
+    <string name="playlist_items_count">%1$dটি প্লেলিস্ট আইটেম</string>
+    <string name="batch_quality_rule">নির্বাচিত আইটেমের কোয়ালিটি নিয়ম</string>
+    <string name="batch_best_source">সেরা সোর্স + অডিও</string>
+    <string name="batch_best_muxed">সেরা সম্মিলিত ফাইল</string>
+    <string name="batch_audio_only">শুধু সেরা অডিও</string>
+    <string name="batch_rule_disclosure">প্রতিটি আইটেম আলাদাভাবে বিশ্লেষণ হবে। দেখানো নিয়ম downscale ছাড়া প্রয়োগ হবে; একটি ব্যর্থ হলে অন্যগুলো বাতিল হবে না।</string>
+    <string name="prepare_selected_items">নির্বাচিত %1$dটি আইটেম বিশ্লেষণ করুন</string>
+    <string name="confirm_batch_title">স্টোরেজ ও কিউ নিশ্চিত করুন</string>
+    <string name="confirm_batch_body">প্রস্তুত: %1$d\nআনুমানিক স্টোরেজ: %2$s\nপ্রস্তুত করা যায়নি: %3$d</string>
+    <string name="size_partly_unknown">আংশিক অজানা</string>
+    <string name="confirm_queue">নিশ্চিত করে কিউ করুন</string>
+    <string name="batch_partial">প্রস্তুত আইটেমগুলো কিউ হয়েছে; ব্যর্থ আইটেমগুলো আলাদা রাখা হয়েছে।</string>
+    <string name="stop_and_save">থামিয়ে সংরক্ষণ</string>
+    <string name="job_playlist_queued">প্লেলিস্ট আইটেমগুলো আলাদাভাবে কিউ হয়েছে</string>
 </resources>

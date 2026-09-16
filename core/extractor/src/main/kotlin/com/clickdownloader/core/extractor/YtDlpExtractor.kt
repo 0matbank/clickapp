@@ -9,6 +9,7 @@ import com.clickdownloader.core.model.LiveStatus
 import com.clickdownloader.core.model.MediaAnalysis
 import com.clickdownloader.core.model.MediaFormatOption
 import com.clickdownloader.core.model.MediaMetadata
+import com.clickdownloader.core.model.PlaylistItem
 import com.clickdownloader.core.model.StreamProtocol
 import com.clickdownloader.core.model.SubtitleTrack
 import java.util.UUID
@@ -19,17 +20,30 @@ class YtDlpExtractor(context: Context) : MediaExtractor {
     private val appContext = context.applicationContext
 
     override suspend fun analyze(url: String, cookieFilePath: String?): MediaAnalysis = withContext(Dispatchers.IO) {
+        executeAnalysis(url, cookieFilePath, playlist = false)
+    }
+
+    override suspend fun analyzePlaylist(url: String, cookieFilePath: String?): MediaAnalysis = withContext(Dispatchers.IO) {
+        executeAnalysis(url, cookieFilePath, playlist = true)
+    }
+
+    private fun executeAnalysis(url: String, cookieFilePath: String?, playlist: Boolean): MediaAnalysis {
         ensureInitialized()
         val operationId = UUID.randomUUID().toString()
         val request = YoutubeDLRequest(url).apply {
             addOption("--dump-single-json")
             addOption("--no-warnings")
-            addOption("--no-playlist")
+            if (playlist) {
+                addOption("--yes-playlist")
+                addOption("--flat-playlist")
+            } else {
+                addOption("--no-playlist")
+            }
             addOption("--skip-download")
             if (cookieFilePath != null) addOption("--cookies", cookieFilePath)
         }
         val response = YoutubeDL.getInstance().execute(request, operationId)
-        YtDlpJsonNormalizer.normalize(YoutubeDL.objectMapper.readTree(response.out), url)
+        return YtDlpJsonNormalizer.normalize(YoutubeDL.objectMapper.readTree(response.out), url)
     }
 
     override fun cancel(operationId: String): Boolean = YoutubeDL.getInstance().destroyProcessById(operationId)
@@ -77,6 +91,19 @@ object YtDlpJsonNormalizer {
             ?.mapIndexed { index, node -> node.asFormat(index) }
             .orEmpty()
         val subtitles = parseSubtitles(root.path("subtitles"), false) + parseSubtitles(root.path("automatic_captions"), true)
+        val playlistItems = root.path("entries").takeIf(JsonNode::isArray)?.mapIndexedNotNull { index, entry ->
+            val entryUrl = entry.text("webpage_url") ?: entry.text("url") ?: entry.text("original_url")
+            entryUrl?.let {
+                PlaylistItem(
+                    id = entry.text("id") ?: "item-$index",
+                    sourceUrl = it,
+                    title = entry.text("title") ?: it,
+                    position = index,
+                    durationMillis = entry.number("duration")?.times(1_000)?.toLong(),
+                    thumbnailUrl = entry.text("thumbnail"),
+                )
+            }
+        }.orEmpty()
         return MediaAnalysis(
             metadata = metadata,
             formats = formats,
@@ -84,6 +111,7 @@ object YtDlpJsonNormalizer {
             extractorKey = root.text("extractor_key"),
             webpageUrl = canonicalUrl,
             isPlaylist = root.text("_type") == "playlist",
+            playlistItems = playlistItems,
         )
     }
 

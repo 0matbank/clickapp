@@ -80,4 +80,18 @@
     <string name="select_video_then_audio">Select video, then audio</string>
     <string name="download_exact_format">Download this exact format</string>
     <string name="recommended_for_device">Recommended for this device</string>
+    <string name="playlist_items_count">%1$d playlist items</string>
+    <string name="batch_quality_rule">Quality rule for selected items</string>
+    <string name="batch_best_source">Best source + audio</string>
+    <string name="batch_best_muxed">Best combined file</string>
+    <string name="batch_audio_only">Best audio only</string>
+    <string name="batch_rule_disclosure">Each selected item is analyzed independently. The visible rule is applied without downscaling; failures do not cancel other items.</string>
+    <string name="prepare_selected_items">Analyze %1$d selected items</string>
+    <string name="confirm_batch_title">Confirm storage and queue</string>
+    <string name="confirm_batch_body">Ready: %1$d\nEstimated storage: %2$s\nItems that could not be prepared: %3$d</string>
+    <string name="size_partly_unknown">partly unknown</string>
+    <string name="confirm_queue">Confirm and queue</string>
+    <string name="batch_partial">Available items were queued; failed playlist items stayed isolated.</string>
+    <string name="stop_and_save">Stop &amp; save</string>
+    <string name="job_playlist_queued">Playlist items queued independently</string>
 </resources>

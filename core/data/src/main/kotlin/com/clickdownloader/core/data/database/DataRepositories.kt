@@ -7,6 +7,7 @@ import com.clickdownloader.core.domain.DownloadRequestRepository
 import com.clickdownloader.core.domain.OutputFileRepository
 import com.clickdownloader.core.domain.ExtractionRepository
 import com.clickdownloader.core.domain.FragmentCheckpointRepository
+import com.clickdownloader.core.domain.PlaylistRepository
 
 object DataRepositories {
     @Volatile
@@ -35,4 +36,7 @@ object DataRepositories {
 
     fun createFragmentCheckpointRepository(context: Context): FragmentCheckpointRepository =
         RoomFragmentCheckpointRepository(database(context).fragmentCheckpointDao())
+
+    fun createPlaylistRepository(context: Context): PlaylistRepository =
+        RoomPlaylistRepository(database(context).playlistDao())
 }

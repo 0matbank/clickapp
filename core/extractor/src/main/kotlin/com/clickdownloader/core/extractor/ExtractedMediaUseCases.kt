@@ -4,6 +4,7 @@ import com.clickdownloader.core.domain.DownloadJobRepository
 import com.clickdownloader.core.domain.DownloadRequestRepository
 import com.clickdownloader.core.domain.ExtractionRepository
 import com.clickdownloader.core.domain.MediaExtractor
+import com.clickdownloader.core.domain.PlaylistRepository
 import com.clickdownloader.core.download.FilenamePolicy
 import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.DownloadJobState
@@ -15,6 +16,26 @@ import com.clickdownloader.core.model.SelectedFormat
 import com.clickdownloader.core.model.StreamProtocol
 import java.util.UUID
 
+enum class BatchQualityRule { BEST_SOURCE_WITH_AUDIO, BEST_MUXED, AUDIO_ONLY }
+
+data class PreparedBatchItem(
+    val playlistItemId: String,
+    val pending: PendingMediaSelection,
+    val primary: MediaFormatOption,
+    val audio: MediaFormatOption?,
+)
+
+data class BatchPreparation(
+    val playlistId: String,
+    val items: List<PreparedBatchItem>,
+    val failedItemIds: List<String>,
+) {
+    val knownBytes: Long = items.mapNotNull { item ->
+        listOfNotNull(item.primary.estimatedBytes, item.audio?.estimatedBytes).takeIf { it.isNotEmpty() }?.sum()
+    }.sum()
+    val allSizesKnown: Boolean = items.all { it.primary.estimatedBytes != null && (it.audio == null || it.audio.estimatedBytes != null) }
+}
+
 data class PendingMediaSelection(val jobId: String, val analysis: MediaAnalysis)
 
 class AnalyzeExtractedMediaUseCase(
@@ -22,6 +43,7 @@ class AnalyzeExtractedMediaUseCase(
     private val extraction: ExtractionRepository,
     private val extractor: MediaExtractor,
     private val appVersion: String,
+    private val playlists: PlaylistRepository? = null,
 ) {
     suspend operator fun invoke(url: String, cookieFilePath: String? = null): PendingMediaSelection {
         val id = UUID.randomUUID().toString()
@@ -29,13 +51,14 @@ class AnalyzeExtractedMediaUseCase(
         jobs.upsert(DownloadJob(id, url, url, DownloadJobState.CREATED, now, now, appVersion = appVersion, engineVersion = extractor.engineVersion()))
         jobs.updateState(id, DownloadJobState.ANALYZING)
         return try {
-            val raw = extractor.analyze(url, cookieFilePath)
+            val raw = extractor.analyzePlaylist(url, cookieFilePath)
             val analysis = raw.copy(
                 metadata = raw.metadata.copy(jobId = id),
                 formats = raw.formats.map { it.copy(compatibility = AndroidFormatCompatibility.evaluate(it)) },
             )
-            require(analysis.formats.isNotEmpty()) { "The extractor returned no source formats" }
+            require(analysis.formats.isNotEmpty() || analysis.playlistItems.isNotEmpty()) { "The extractor returned no source formats or playlist items" }
             extraction.saveMetadata(analysis.metadata)
+            if (analysis.isPlaylist) playlists?.savePlaylist(id, url, analysis.metadata.title, analysis.playlistItems)
             jobs.upsert(jobs.findById(id)!!.copy(displayTitle = analysis.metadata.title, engineVersion = extractor.engineVersion()))
             jobs.updateState(id, DownloadJobState.WAITING_FOR_SELECTION)
             PendingMediaSelection(id, analysis)
@@ -43,6 +66,65 @@ class AnalyzeExtractedMediaUseCase(
             jobs.updateState(id, DownloadJobState.FAILED, "EXTRACTION_FAILED", error.message)
             throw error
         }
+    }
+}
+
+class PreparePlaylistBatchUseCase(
+    private val analyze: AnalyzeExtractedMediaUseCase,
+) {
+    suspend operator fun invoke(
+        playlistId: String,
+        items: List<com.clickdownloader.core.model.PlaylistItem>,
+        selectedIds: Set<String>,
+        rule: BatchQualityRule,
+    ): BatchPreparation {
+        val prepared = mutableListOf<PreparedBatchItem>()
+        val failures = mutableListOf<String>()
+        items.filter { it.id in selectedIds }.forEach { item ->
+            runCatching {
+                val pending = analyze(item.sourceUrl)
+                val formats = pending.analysis.formats.filterNot { it.drmProtected }
+                val audioOnly = formats.filter(MediaFormatOption::isAudioOnly).maxByOrNull { it.audioBitrate ?: 0L }
+                val primary = when (rule) {
+                    BatchQualityRule.AUDIO_ONLY -> audioOnly
+                    BatchQualityRule.BEST_MUXED -> formats.filter { it.hasVideo && it.hasAudio }.maxWithOrNull(videoComparator)
+                    BatchQualityRule.BEST_SOURCE_WITH_AUDIO -> formats.filter { it.hasVideo }.maxWithOrNull(videoComparator)
+                } ?: error("No format matches the selected batch rule")
+                val companion = if (rule == BatchQualityRule.BEST_SOURCE_WITH_AUDIO && !primary.hasAudio) {
+                    audioOnly ?: error("No companion audio format is available")
+                } else null
+                PreparedBatchItem(item.id, pending, primary, companion)
+            }.onSuccess(prepared::add).onFailure { failures += item.id }
+        }
+        return BatchPreparation(playlistId, prepared, failures)
+    }
+
+    private companion object {
+        val videoComparator = compareBy<MediaFormatOption>(
+            { (it.width ?: 0).toLong() * (it.height ?: 0) },
+            { it.framesPerSecond ?: 0.0 },
+            { it.videoBitrate ?: 0L },
+        )
+    }
+}
+
+class ConfirmPlaylistBatchUseCase(
+    private val queueExactFormat: QueueExactFormatUseCase,
+    private val playlists: PlaylistRepository,
+    private val jobs: DownloadJobRepository,
+) {
+    suspend operator fun invoke(batch: BatchPreparation): Pair<List<String>, List<String>> {
+        val queued = mutableListOf<String>()
+        val failed = batch.failedItemIds.toMutableList()
+        batch.items.forEach { item ->
+            runCatching {
+                queueExactFormat(item.pending, item.primary, item.audio).also {
+                    playlists.attachJob(batch.playlistId, item.playlistItemId, it)
+                }
+            }.onSuccess(queued::add).onFailure { failed += item.playlistItemId }
+        }
+        if (queued.isNotEmpty()) jobs.updateState(batch.playlistId, DownloadJobState.PLAYLIST_QUEUED)
+        return queued to failed
     }
 }
 
@@ -90,6 +172,7 @@ class QueueExactFormatUseCase(
         )
         val protocols = listOfNotNull(primary.protocol, audio?.protocol)
         val kind = when {
+            pending.analysis.metadata.liveStatus == com.clickdownloader.core.model.LiveStatus.LIVE -> DownloadKind.LIVE
             StreamProtocol.HLS in protocols -> DownloadKind.HLS
             StreamProtocol.DASH in protocols -> DownloadKind.DASH
             else -> DownloadKind.EXTRACTED

@@ -22,7 +22,7 @@ interface DownloadJobDao {
     @Query("UPDATE download_jobs SET downloadedBytes = :downloadedBytes, totalBytes = :totalBytes, updatedAtEpochMillis = :updatedAt WHERE id = :id")
     suspend fun updateProgress(id: String, downloadedBytes: Long, totalBytes: Long?, updatedAt: Long)
 
-    @Query("UPDATE download_jobs SET state = 'QUEUED', updatedAtEpochMillis = :updatedAt WHERE state IN ('PREPARING', 'DOWNLOADING_VIDEO', 'DOWNLOADING_AUDIO', 'VERIFYING') AND id IN (SELECT jobId FROM download_requests)")
+    @Query("UPDATE download_jobs SET state = 'QUEUED', updatedAtEpochMillis = :updatedAt WHERE state IN ('PREPARING', 'DOWNLOADING_VIDEO', 'DOWNLOADING_AUDIO', 'DOWNLOADING_FRAGMENTS', 'MERGING', 'VERIFYING') AND id IN (SELECT jobId FROM download_requests)")
     suspend fun recoverInterruptedJobs(updatedAt: Long)
 }
 
@@ -69,4 +69,16 @@ interface FragmentCheckpointDao {
 
     @Query("DELETE FROM fragment_states WHERE jobId = :jobId")
     suspend fun deleteForJob(jobId: String)
+}
+
+@Dao
+interface PlaylistDao {
+    @Upsert
+    suspend fun upsertPlaylist(playlist: PlaylistEntity)
+
+    @Upsert
+    suspend fun upsertItems(items: List<PlaylistItemEntity>)
+
+    @Query("UPDATE playlist_items SET jobId = :jobId WHERE playlistId = :playlistId AND itemId = :itemId")
+    suspend fun attachJob(playlistId: String, itemId: String, jobId: String)
 }
