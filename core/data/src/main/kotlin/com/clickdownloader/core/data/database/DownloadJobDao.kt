@@ -46,6 +46,9 @@ interface DownloadRequestDao {
 
 @Dao
 interface OutputFileDao {
+    @Query("SELECT * FROM output_files ORDER BY createdAtEpochMillis DESC")
+    fun observeAll(): Flow<List<OutputFileEntity>>
+
     @Upsert
     suspend fun upsert(file: OutputFileEntity)
 }

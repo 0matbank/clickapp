@@ -6,12 +6,37 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clickdownloader.core.model.SelectedFormat
 import com.yausername.ffmpeg.FFmpeg
 import java.io.File
+import java.security.MessageDigest
+import android.net.Uri
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MediaArtifactVerifierTest {
+    @Test
+    fun compatibleCopyPreservesOriginalAndResolution() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        FFmpeg.getInstance().init(context)
+        val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        val directory = File(context.cacheDir, "compatible-copy-${System.nanoTime()}").apply { mkdirs() }
+        val original = File(directory, "original.mkv")
+        execute(context, ffmpeg, "-f", "lavfi", "-i", "color=size=854x480:rate=2:duration=2", "-f", "lavfi", "-i", "sine=frequency=550:duration=2", "-c:v", "mpeg4", "-c:a", "aac", "-shortest", original.absolutePath)
+        val hashBefore = sha256(original)
+
+        val result = CompatibleCopyProcessor(context).convert(Uri.fromFile(original), File(directory, "work"), true, true)
+
+        assertTrue(original.exists())
+        assertEquals(hashBefore, sha256(original))
+        assertEquals(hashBefore, result.originalSha256)
+        assertEquals(854, result.outputInspection.width)
+        assertEquals(480, result.outputInspection.height)
+        assertTrue(result.outputInspection.hasVideo && result.outputInspection.hasAudio)
+        directory.deleteRecursively()
+    }
+
     @Test
     fun finalizesInterruptedLiveTransportStreamWithoutReencoding() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -74,5 +99,18 @@ class MediaArtifactVerifierTest {
             .start()
         val output = process.inputStream.bufferedReader().readText()
         check(process.waitFor() == 0) { "FFmpeg fixture command failed: $output" }
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

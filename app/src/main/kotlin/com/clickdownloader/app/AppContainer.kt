@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
 
 class AppContainer(context: Context) {
-    private val appContext = context.applicationContext
+    val appContext: Context = context.applicationContext
 
     val downloadJobRepository: DownloadJobRepository by lazy {
         DataRepositories.createDownloadJobRepository(appContext)

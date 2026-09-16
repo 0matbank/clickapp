@@ -65,6 +65,14 @@ Phase 7 — Floating Bubble is complete:
 - Optional foreground-app allowlist through a narrowly scoped accessibility service that cannot read window content
 - Clear Copy Link / Android Share fallback when clipboard or accessibility assistance is unavailable
 
+Phase 8 — Compatible Copy and Player is complete:
+
+- Media3/ExoPlayer playback for verified Library video/audio, including embedded subtitles, speed and fit/zoom controls
+- Decoder capability checks include codec MIME, resolution, frame rate and HDR profile rather than hiding formats
+- Explicit H.264 + AAC-LC + 8-bit YUV420p MP4 conversion at the original resolution
+- Original media is SHA-256 checked before/after and never replaced; the compatible output is independently verified
+- Storage, estimated duration, battery and thermal preflight with conservative low-battery/hot-device blocking
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:

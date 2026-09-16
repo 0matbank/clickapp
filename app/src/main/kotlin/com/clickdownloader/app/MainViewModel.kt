@@ -7,6 +7,7 @@ import com.clickdownloader.core.domain.DownloadJobRepository
 import com.clickdownloader.core.domain.DownloadRequestRepository
 import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.domain.StorageGateway
+import com.clickdownloader.core.domain.OutputFileRepository
 import com.clickdownloader.core.download.CreateDirectDownloadUseCase
 import com.clickdownloader.core.extractor.AnalyzeExtractedMediaUseCase
 import com.clickdownloader.core.extractor.PendingMediaSelection
@@ -21,6 +22,10 @@ import com.clickdownloader.core.model.AppThemeMode
 import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.MediaFormatOption
 import com.clickdownloader.core.model.DownloadKind
+import com.clickdownloader.core.model.LibraryMedia
+import com.clickdownloader.core.media.CompatibleCopyProcessor
+import com.clickdownloader.core.media.ConversionPreflight
+import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -39,9 +44,13 @@ data class MainUiState(
     val batchRule: BatchQualityRule = BatchQualityRule.BEST_SOURCE_WITH_AUDIO,
     val batchPreparation: BatchPreparation? = null,
     val liveJobIds: Set<String> = emptySet(),
+    val library: List<LibraryMedia> = emptyList(),
+    val compatibleCopyPrompt: CompatibleCopyPrompt? = null,
 )
 
-enum class UiMessage { INVALID_URL, ANALYZE_FAILED, DOWNLOAD_QUEUED, BATCH_PARTIAL, FOLDER_SAVED, FOLDER_ERROR, BUBBLE_SHARE_FALLBACK }
+data class CompatibleCopyPrompt(val media: LibraryMedia, val preflight: ConversionPreflight)
+
+enum class UiMessage { INVALID_URL, ANALYZE_FAILED, DOWNLOAD_QUEUED, BATCH_PARTIAL, FOLDER_SAVED, FOLDER_ERROR, BUBBLE_SHARE_FALLBACK, CONVERSION_PREFLIGHT_FAILED }
 
 private data class SelectionState(
     val pending: PendingMediaSelection? = null,
@@ -55,6 +64,7 @@ private data class SelectionState(
 class MainViewModel(
     private val jobs: DownloadJobRepository,
     private val downloadRequests: DownloadRequestRepository,
+    private val outputFiles: OutputFileRepository,
     private val settings: SettingsRepository,
     private val storage: StorageGateway,
     private val createDirectDownload: CreateDirectDownloadUseCase,
@@ -63,17 +73,21 @@ class MainViewModel(
     private val preparePlaylistBatch: PreparePlaylistBatchUseCase,
     private val confirmPlaylistBatch: ConfirmPlaylistBatchUseCase,
     private val exportSessionCookie: (String) -> String?,
+    private val compatibleCopyProcessor: CompatibleCopyProcessor,
 ) : ViewModel() {
     private val inputUrl = MutableStateFlow("")
     private val message = MutableStateFlow<UiMessage?>(null)
     private val selection = MutableStateFlow(SelectionState())
+    private val compatibleCopyPrompt = MutableStateFlow<CompatibleCopyPrompt?>(null)
 
-    private val jobAndLiveIds = combine(jobs.observeJobs(), downloadRequests.observeRequests()) { jobList, requests ->
-        jobList to requests.filter { it.kind == DownloadKind.LIVE }.mapTo(mutableSetOf()) { it.jobId }
+    private val jobLibrary = combine(jobs.observeJobs(), downloadRequests.observeRequests(), outputFiles.observeFiles()) { jobList, requests, library ->
+        Triple(jobList, requests.filter { it.kind == DownloadKind.LIVE }.mapTo(mutableSetOf()) { it.jobId }, library)
     }
+    private val backgroundUi = combine(jobLibrary, compatibleCopyPrompt) { data, prompt -> data to prompt }
 
-    val uiState = combine(inputUrl, jobAndLiveIds, settings.settings, message, selection) {
-            url, jobInfo, appSettings, currentMessage, selectionState ->
+    val uiState = combine(inputUrl, backgroundUi, settings.settings, message, selection) {
+            url, background, appSettings, currentMessage, selectionState ->
+        val (jobInfo, copyPrompt) = background
         MainUiState(
             inputUrl = url,
             jobs = jobInfo.first,
@@ -86,6 +100,8 @@ class MainViewModel(
             batchRule = selectionState.batchRule,
             batchPreparation = selectionState.batchPreparation,
             liveJobIds = jobInfo.second,
+            library = jobInfo.third,
+            compatibleCopyPrompt = copyPrompt,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
@@ -198,7 +214,19 @@ class MainViewModel(
     fun setBubbleSizeDp(value: Int) { viewModelScope.launch { settings.setBubbleSizeDp(value) } }
     fun setBubbleAllowlist(value: Set<String>) { viewModelScope.launch { settings.setBubbleAllowlistedPackages(value) } }
     fun setAccessibilityBubbleAssist(value: Boolean) { viewModelScope.launch { settings.setAccessibilityBubbleAssist(value) } }
+    fun setAllowConversionOnLowBattery(value: Boolean) { viewModelScope.launch { settings.setAllowConversionOnLowBattery(value) } }
+    fun setAllowConversionWhenHot(value: Boolean) { viewModelScope.launch { settings.setAllowConversionWhenHot(value) } }
     fun showBubbleFallback() { message.value = UiMessage.BUBBLE_SHARE_FALLBACK }
+
+    fun prepareCompatibleCopy(media: LibraryMedia) {
+        viewModelScope.launch {
+            runCatching { compatibleCopyProcessor.preflight(Uri.parse(media.uri)) }
+                .onSuccess { compatibleCopyPrompt.value = CompatibleCopyPrompt(media, it) }
+                .onFailure { message.value = UiMessage.CONVERSION_PREFLIGHT_FAILED }
+        }
+    }
+
+    fun dismissCompatibleCopy() { compatibleCopyPrompt.value = null }
 
     fun selectDownloadDirectory(uri: String) {
         viewModelScope.launch {
@@ -228,6 +256,7 @@ class MainViewModel(
                 return MainViewModel(
                     container.downloadJobRepository,
                     container.downloadRequestRepository,
+                    container.outputFileRepository,
                     container.settingsRepository,
                     container.storageGateway,
                     CreateDirectDownloadUseCase(container.downloadJobRepository, container.downloadRequestRepository, container.directMediaProbe, BuildConfig.VERSION_NAME),
@@ -236,6 +265,7 @@ class MainViewModel(
                     PreparePlaylistBatchUseCase(analyze),
                     ConfirmPlaylistBatchUseCase(queue, container.playlistRepository, container.downloadJobRepository),
                     container::exportBrowserSession,
+                    CompatibleCopyProcessor(container.appContext),
                 ) as T
             }
         }

@@ -78,14 +78,17 @@ import com.clickdownloader.app.MainViewModel
 import com.clickdownloader.app.R
 import com.clickdownloader.app.UiMessage
 import com.clickdownloader.app.BrowserActivity
+import com.clickdownloader.app.PlayerActivity
 import com.clickdownloader.app.download.DownloadService
 import com.clickdownloader.app.bubble.BubbleOverlayService
+import com.clickdownloader.app.media.CompatibleCopyService
 import com.clickdownloader.core.model.AppLanguage
 import com.clickdownloader.core.model.AppThemeMode
 import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.DownloadJobState
 import com.clickdownloader.core.model.FormatCompatibility
 import com.clickdownloader.core.model.MediaFormatOption
+import com.clickdownloader.core.model.LibraryMedia
 import com.clickdownloader.core.extractor.BatchQualityRule
 
 private enum class Destination(
@@ -109,6 +112,7 @@ fun ClickDownloaderApp(
     val currentDestination = backStackEntry?.destination
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val shareMediaLabel = stringResource(R.string.share_media)
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     LaunchedEffect(state.settings.language) {
@@ -130,6 +134,7 @@ fun ClickDownloaderApp(
                 UiMessage.FOLDER_SAVED -> R.string.folder_saved
                 UiMessage.FOLDER_ERROR -> R.string.folder_error
                 UiMessage.BUBBLE_SHARE_FALLBACK -> R.string.bubble_share_fallback
+                UiMessage.CONVERSION_PREFLIGHT_FAILED -> R.string.conversion_preflight_failed
             },
         )
     }
@@ -217,7 +222,24 @@ fun ClickDownloaderApp(
                     onFinalizeLive = { sendDownloadAction(context, DownloadService.ACTION_FINALIZE_LIVE, it) },
                 )
             }
-            composable(Destination.LIBRARY.route) { LibraryScreen() }
+            composable(Destination.LIBRARY.route) {
+                LibraryScreen(
+                    files = state.library,
+                    onPlay = { media ->
+                        context.startActivity(Intent(context, PlayerActivity::class.java)
+                            .putExtra(PlayerActivity.EXTRA_URI, media.uri)
+                            .putExtra(PlayerActivity.EXTRA_TITLE, media.displayName))
+                    },
+                    onShare = { media ->
+                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                            type = media.mimeType.ifBlank { "video/*" }
+                            putExtra(Intent.EXTRA_STREAM, Uri.parse(media.uri))
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }, shareMediaLabel))
+                    },
+                    onCompatibleCopy = viewModel::prepareCompatibleCopy,
+                )
+            }
             composable(Destination.SETTINGS.route) {
                 SettingsScreen(
                     state = state,
@@ -233,9 +255,36 @@ fun ClickDownloaderApp(
                     onBubbleSizeChanged = viewModel::setBubbleSizeDp,
                     onBubbleAllowlistChanged = viewModel::setBubbleAllowlist,
                     onAccessibilityAssistChanged = viewModel::setAccessibilityBubbleAssist,
+                    onAllowLowBatteryConversionChanged = viewModel::setAllowConversionOnLowBattery,
+                    onAllowHotConversionChanged = viewModel::setAllowConversionWhenHot,
                 )
             }
         }
+    }
+    state.compatibleCopyPrompt?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissCompatibleCopy,
+            title = { Text(stringResource(R.string.compatible_copy_title)) },
+            text = {
+                Text(stringResource(
+                    R.string.compatible_copy_preflight,
+                    humanSize(prompt.preflight.requiredFreeBytes),
+                    formatDuration(prompt.preflight.estimatedMillis),
+                    prompt.preflight.batteryPercent?.let { "$it%" } ?: stringResource(R.string.unknown_value),
+                    if (prompt.preflight.deviceHot) stringResource(R.string.device_hot) else stringResource(R.string.device_temperature_ok),
+                ))
+            },
+            confirmButton = {
+                Button(
+                    enabled = prompt.preflight.availableBytes >= prompt.preflight.requiredFreeBytes,
+                    onClick = {
+                        CompatibleCopyService.start(context, prompt.media.uri, prompt.media.jobId, prompt.media.displayName)
+                        viewModel.dismissCompatibleCopy()
+                    },
+                ) { Text(stringResource(R.string.create_compatible_copy)) }
+            },
+            dismissButton = { OutlinedButton(onClick = viewModel::dismissCompatibleCopy) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 }
 
@@ -533,14 +582,32 @@ private fun DownloadsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryScreen() {
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text(stringResource(R.string.library_title)) })
-        Text(
-            text = stringResource(R.string.library_empty),
-            modifier = Modifier.padding(20.dp),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+private fun LibraryScreen(
+    files: List<LibraryMedia>,
+    onPlay: (LibraryMedia) -> Unit,
+    onShare: (LibraryMedia) -> Unit,
+    onCompatibleCopy: (LibraryMedia) -> Unit,
+) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { TopAppBar(title = { Text(stringResource(R.string.library_title)) }) }
+        if (files.isEmpty()) item {
+            Text(text = stringResource(R.string.library_empty), modifier = Modifier.padding(20.dp), style = MaterialTheme.typography.bodyLarge)
+        }
+        items(files, key = { it.id }) { media ->
+            Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(media.displayName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text("${humanSize(media.sizeBytes)} • ${if (media.verified) stringResource(R.string.verified) else stringResource(R.string.not_verified)}", style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { onPlay(media) }) { Text(stringResource(R.string.play)) }
+                        OutlinedButton(onClick = { onShare(media) }) { Text(stringResource(R.string.share_media)) }
+                        if (media.mimeType.startsWith("video/")) {
+                            OutlinedButton(onClick = { onCompatibleCopy(media) }) { Text(stringResource(R.string.make_compatible_copy)) }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -557,6 +624,8 @@ private fun SettingsScreen(
     onBubbleSizeChanged: (Int) -> Unit,
     onBubbleAllowlistChanged: (Set<String>) -> Unit,
     onAccessibilityAssistChanged: (Boolean) -> Unit,
+    onAllowLowBatteryConversionChanged: (Boolean) -> Unit,
+    onAllowHotConversionChanged: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -679,7 +748,26 @@ private fun SettingsScreen(
                 }
             }
         }
+        item { HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) }
+        item {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Text(stringResource(R.string.settings_conversion), style = MaterialTheme.typography.titleMedium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.allow_low_battery_conversion), modifier = Modifier.weight(1f))
+                    Switch(checked = state.settings.allowConversionOnLowBattery, onCheckedChange = onAllowLowBatteryConversionChanged)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.allow_hot_conversion), modifier = Modifier.weight(1f))
+                    Switch(checked = state.settings.allowConversionWhenHot, onCheckedChange = onAllowHotConversionChanged)
+                }
+            }
+        }
     }
+}
+
+private fun formatDuration(millis: Long): String {
+    val minutes = (millis / 60_000).coerceAtLeast(1)
+    return "$minutes min"
 }
 
 private val BUBBLE_PACKAGES = linkedMapOf(

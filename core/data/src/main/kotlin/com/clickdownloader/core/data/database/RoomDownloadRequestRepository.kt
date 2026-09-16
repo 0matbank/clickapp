@@ -6,6 +6,7 @@ import com.clickdownloader.core.model.DownloadKind
 import com.clickdownloader.core.model.DownloadRequest
 import com.clickdownloader.core.model.DuplicatePolicy
 import com.clickdownloader.core.model.FinalizedFile
+import com.clickdownloader.core.model.LibraryMedia
 import com.clickdownloader.core.model.PartialFilePolicy
 import java.util.UUID
 import java.util.Base64
@@ -21,6 +22,12 @@ class RoomDownloadRequestRepository(private val dao: DownloadRequestDao) : Downl
 }
 
 class RoomOutputFileRepository(private val dao: OutputFileDao) : OutputFileRepository {
+    override fun observeFiles(): Flow<List<LibraryMedia>> = dao.observeAll().map { rows ->
+        rows.map { row ->
+            LibraryMedia(row.id, row.jobId, row.contentUri, row.displayName, row.mimeType.orEmpty(), row.sizeBytes ?: 0L, row.isVerified, row.createdAtEpochMillis)
+        }
+    }
+
     override suspend fun add(jobId: String, file: FinalizedFile, verified: Boolean) = dao.upsert(
         OutputFileEntity(
             id = UUID.randomUUID().toString(),

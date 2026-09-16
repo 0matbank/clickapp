@@ -51,6 +51,17 @@ data class FinalizedFile(
     val sizeBytes: Long,
 )
 
+data class LibraryMedia(
+    val id: String,
+    val jobId: String,
+    val uri: String,
+    val displayName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val verified: Boolean,
+    val createdAtEpochMillis: Long,
+)
+
 sealed interface DownloadControl {
     data object Continue : DownloadControl
     data object Pause : DownloadControl

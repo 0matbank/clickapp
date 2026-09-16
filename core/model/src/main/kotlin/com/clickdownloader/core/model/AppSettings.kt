@@ -23,4 +23,6 @@ data class AppSettings(
     val bubbleSizeDp: Int = 56,
     val bubbleAllowlistedPackages: Set<String> = emptySet(),
     val accessibilityBubbleAssist: Boolean = false,
+    val allowConversionOnLowBattery: Boolean = false,
+    val allowConversionWhenHot: Boolean = false,
 )

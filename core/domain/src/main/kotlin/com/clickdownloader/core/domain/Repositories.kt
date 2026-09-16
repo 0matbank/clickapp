@@ -11,6 +11,7 @@ import com.clickdownloader.core.model.MediaAnalysis
 import com.clickdownloader.core.model.MediaMetadata
 import com.clickdownloader.core.model.SelectedFormat
 import com.clickdownloader.core.model.FragmentCheckpoint
+import com.clickdownloader.core.model.LibraryMedia
 import com.clickdownloader.core.model.MediaProcessProgress
 import com.clickdownloader.core.model.ProcessedMediaArtifact
 import com.clickdownloader.core.model.PlaylistItem
@@ -35,6 +36,7 @@ interface DownloadRequestRepository {
 }
 
 interface OutputFileRepository {
+    fun observeFiles(): Flow<List<LibraryMedia>>
     suspend fun add(jobId: String, file: FinalizedFile, verified: Boolean)
 }
 
@@ -87,6 +89,8 @@ interface SettingsRepository {
     suspend fun setBubbleSizeDp(sizeDp: Int)
     suspend fun setBubbleAllowlistedPackages(packages: Set<String>)
     suspend fun setAccessibilityBubbleAssist(enabled: Boolean)
+    suspend fun setAllowConversionOnLowBattery(enabled: Boolean)
+    suspend fun setAllowConversionWhenHot(enabled: Boolean)
 }
 
 interface StorageGateway {

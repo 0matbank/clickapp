@@ -47,6 +47,8 @@ class DataStoreSettingsRepository(
                 bubbleSizeDp = (preferences[Keys.BUBBLE_SIZE] ?: 56).coerceIn(40, 80),
                 bubbleAllowlistedPackages = preferences[Keys.BUBBLE_ALLOWLIST].orEmpty(),
                 accessibilityBubbleAssist = preferences[Keys.BUBBLE_ACCESSIBILITY] ?: false,
+                allowConversionOnLowBattery = preferences[Keys.CONVERT_LOW_BATTERY] ?: false,
+                allowConversionWhenHot = preferences[Keys.CONVERT_WHEN_HOT] ?: false,
             )
         }
 
@@ -89,6 +91,14 @@ class DataStoreSettingsRepository(
         dataStore.edit { it[Keys.BUBBLE_ACCESSIBILITY] = enabled }
     }
 
+    override suspend fun setAllowConversionOnLowBattery(enabled: Boolean) {
+        dataStore.edit { it[Keys.CONVERT_LOW_BATTERY] = enabled }
+    }
+
+    override suspend fun setAllowConversionWhenHot(enabled: Boolean) {
+        dataStore.edit { it[Keys.CONVERT_WHEN_HOT] = enabled }
+    }
+
     private object Keys {
         val LANGUAGE = stringPreferencesKey("language")
         val THEME = stringPreferencesKey("theme")
@@ -99,6 +109,8 @@ class DataStoreSettingsRepository(
         val BUBBLE_SIZE = intPreferencesKey("bubble_size_dp")
         val BUBBLE_ALLOWLIST = stringSetPreferencesKey("bubble_allowlisted_packages")
         val BUBBLE_ACCESSIBILITY = booleanPreferencesKey("bubble_accessibility_assist")
+        val CONVERT_LOW_BATTERY = booleanPreferencesKey("allow_conversion_low_battery")
+        val CONVERT_WHEN_HOT = booleanPreferencesKey("allow_conversion_when_hot")
     }
 
     private companion object {
