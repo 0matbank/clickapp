@@ -93,8 +93,12 @@ class QuickAnalyzeActivity : AppCompatActivity() {
                     finish()
                 }
                 .onFailure {
-                    working = false
-                    error = getString(R.string.direct_analyze_failed)
+                    startActivity(
+                        Intent(this@QuickAnalyzeActivity, MainActivity::class.java)
+                            .putExtra(MainActivity.EXTRA_URL, url)
+                            .putExtra(MainActivity.EXTRA_AUTO_ANALYZE, true),
+                    )
+                    finish()
                 }
         }
     }

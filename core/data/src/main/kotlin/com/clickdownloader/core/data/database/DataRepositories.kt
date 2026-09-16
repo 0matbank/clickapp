@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.clickdownloader.core.domain.DownloadJobRepository
 import com.clickdownloader.core.domain.DownloadRequestRepository
 import com.clickdownloader.core.domain.OutputFileRepository
+import com.clickdownloader.core.domain.ExtractionRepository
 
 object DataRepositories {
     @Volatile
@@ -27,4 +28,7 @@ object DataRepositories {
 
     fun createOutputFileRepository(context: Context): OutputFileRepository =
         RoomOutputFileRepository(database(context).outputFileDao())
+
+    fun createExtractionRepository(context: Context): ExtractionRepository =
+        RoomExtractionRepository(database(context).extractionDao())
 }

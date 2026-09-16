@@ -14,5 +14,7 @@ All dependency versions are exact and centralized in `gradle/libs.versions.toml`
 | OkHttp / MockWebServer | HTTP probing, resumable transfer and deterministic transfer tests | Apache-2.0 |
 | AndroidX WorkManager | Network-constrained delayed retries and restart recovery | Apache-2.0 |
 | AndroidX DocumentFile | User-selected SAF destination finalization | Apache-2.0 |
+| youtubedl-android library 0.18.1 (bundled Python, yt-dlp and QuickJS) | On-device webpage extraction and source format discovery | GPL-3.0 |
+| Jackson 2.11.1 | Parse the extractor's complete JSON result (version aligned with wrapper runtime) | Apache-2.0 |
 
-No extractor, Python runtime, FFmpeg binary, media codec bundle, analytics SDK or advertising SDK is included through Phase 2.
+The extractor runtime is included from Phase 3 and initialized only after a direct-media probe fails. FFmpeg, analytics and advertising SDKs are not included through Phase 3. Distributing a build that links the GPL-3.0 extractor requires GPL-compatible source/license compliance.

@@ -31,6 +31,9 @@ class HttpDirectDownloader(private val client: OkHttpClient) {
         partialFile.parentFile?.mkdirs()
         var offset = partialFile.takeIf(File::exists)?.length() ?: 0L
         val builder = Request.Builder().url(request.url).get()
+        request.headers.forEach { (name, value) ->
+            if (!name.equals("Host", true) && !name.equals("Content-Length", true)) builder.header(name, value)
+        }
         if (offset > 0) {
             builder.header("Range", "bytes=$offset-")
             (request.etag ?: request.lastModified)?.let { builder.header("If-Range", it) }

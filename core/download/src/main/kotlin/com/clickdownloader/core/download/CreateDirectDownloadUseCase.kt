@@ -21,6 +21,7 @@ class CreateDirectDownloadUseCase(
         require(uri.scheme.equals("https", true) || uri.scheme.equals("http", true))
         require(!uri.host.isNullOrBlank())
         val normalized = uri.normalize().toASCIIString()
+        val media = withContext(Dispatchers.IO) { probe.probe(normalized) }
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         jobs.upsert(
@@ -35,28 +36,22 @@ class CreateDirectDownloadUseCase(
             ),
         )
         jobs.updateState(id, DownloadJobState.ANALYZING)
-        try {
-            val media = withContext(Dispatchers.IO) { probe.probe(normalized) }
-            jobs.updateState(id, DownloadJobState.WAITING_FOR_SELECTION)
-            requests.upsert(
-                DownloadRequest(
-                    jobId = id,
-                    url = media.finalUrl,
-                    displayName = media.displayName,
-                    mimeType = media.mimeType,
-                    expectedBytes = media.contentLength,
-                    etag = media.etag,
-                    lastModified = media.lastModified,
-                    supportsRanges = media.supportsRanges,
-                    queuePosition = now,
-                ),
-            )
-            jobs.upsert(jobs.findById(id)!!.copy(displayTitle = media.displayName, totalBytes = media.contentLength))
-            jobs.updateState(id, DownloadJobState.QUEUED)
-            id
-        } catch (error: Throwable) {
-            jobs.updateState(id, DownloadJobState.FAILED, "DIRECT_ANALYZE_FAILED", error.message)
-            throw error
-        }
+        jobs.updateState(id, DownloadJobState.WAITING_FOR_SELECTION)
+        requests.upsert(
+            DownloadRequest(
+                jobId = id,
+                url = media.finalUrl,
+                displayName = media.displayName,
+                mimeType = media.mimeType,
+                expectedBytes = media.contentLength,
+                etag = media.etag,
+                lastModified = media.lastModified,
+                supportsRanges = media.supportsRanges,
+                queuePosition = now,
+            ),
+        )
+        jobs.upsert(jobs.findById(id)!!.copy(displayTitle = media.displayName, totalBytes = media.contentLength))
+        jobs.updateState(id, DownloadJobState.QUEUED)
+        id
     }
 }

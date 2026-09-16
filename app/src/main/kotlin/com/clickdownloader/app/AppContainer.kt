@@ -7,12 +7,15 @@ import com.clickdownloader.core.domain.DownloadJobRepository
 import com.clickdownloader.core.domain.DownloadRequestRepository
 import com.clickdownloader.core.domain.OutputFileRepository
 import com.clickdownloader.core.domain.DownloadFinalizer
+import com.clickdownloader.core.domain.ExtractionRepository
+import com.clickdownloader.core.domain.MediaExtractor
 import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.domain.StorageGateway
 import com.clickdownloader.core.storage.AndroidStorageGateway
 import com.clickdownloader.core.storage.AndroidDownloadFinalizer
 import com.clickdownloader.core.download.DirectMediaProbe
 import com.clickdownloader.core.download.HttpDirectDownloader
+import com.clickdownloader.core.extractor.YtDlpExtractor
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
@@ -35,6 +38,12 @@ class AppContainer(context: Context) {
     val outputFileRepository: OutputFileRepository by lazy {
         DataRepositories.createOutputFileRepository(appContext)
     }
+
+    val extractionRepository: ExtractionRepository by lazy {
+        DataRepositories.createExtractionRepository(appContext)
+    }
+
+    val mediaExtractor: MediaExtractor by lazy { YtDlpExtractor(appContext) }
 
     val storageGateway: StorageGateway by lazy {
         AndroidStorageGateway(appContext)

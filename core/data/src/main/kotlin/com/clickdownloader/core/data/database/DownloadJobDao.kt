@@ -49,3 +49,15 @@ interface OutputFileDao {
     @Upsert
     suspend fun upsert(file: OutputFileEntity)
 }
+
+@Dao
+interface ExtractionDao {
+    @Upsert
+    suspend fun upsertMetadata(metadata: MediaMetadataEntity)
+
+    @Upsert
+    suspend fun upsertSelectedFormat(format: SelectedFormatEntity)
+
+    @Query("SELECT * FROM selected_formats WHERE jobId = :jobId LIMIT 1")
+    suspend fun findSelectedFormat(jobId: String): SelectedFormatEntity?
+}

@@ -7,6 +7,9 @@ import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.DownloadJobState
 import com.clickdownloader.core.model.DownloadRequest
 import com.clickdownloader.core.model.FinalizedFile
+import com.clickdownloader.core.model.MediaAnalysis
+import com.clickdownloader.core.model.MediaMetadata
+import com.clickdownloader.core.model.SelectedFormat
 import kotlinx.coroutines.flow.Flow
 
 interface DownloadJobRepository {
@@ -28,6 +31,18 @@ interface DownloadRequestRepository {
 
 interface OutputFileRepository {
     suspend fun add(jobId: String, file: FinalizedFile, verified: Boolean)
+}
+
+interface MediaExtractor {
+    suspend fun analyze(url: String, cookieFilePath: String? = null): MediaAnalysis
+    fun cancel(operationId: String): Boolean
+    fun engineVersion(): String?
+}
+
+interface ExtractionRepository {
+    suspend fun saveMetadata(metadata: MediaMetadata)
+    suspend fun saveSelectedFormat(format: SelectedFormat)
+    suspend fun findSelectedFormat(jobId: String): SelectedFormat?
 }
 
 interface SettingsRepository {

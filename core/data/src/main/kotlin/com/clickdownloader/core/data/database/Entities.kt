@@ -42,6 +42,7 @@ data class MediaMetadataEntity(
     val uploadDate: String?,
     val liveStatus: String,
     val expiryHintEpochMillis: Long?,
+    @androidx.room.ColumnInfo(defaultValue = "'[]'") val thumbnailUrlsJson: String = "[]",
 )
 
 @Entity(
@@ -177,6 +178,7 @@ data class ErrorSummaryEntity(
 data class DownloadRequestEntity(
     @androidx.room.PrimaryKey val jobId: String,
     val url: String,
+    val secondaryUrl: String?,
     val displayName: String,
     val mimeType: String?,
     val kind: String,
@@ -186,6 +188,8 @@ data class DownloadRequestEntity(
     val temporaryPath: String?,
     val outputUri: String?,
     val supportsRanges: Boolean?,
+    @androidx.room.ColumnInfo(defaultValue = "''") val headersEncoded: String,
+    @androidx.room.ColumnInfo(defaultValue = "''") val secondaryHeadersEncoded: String,
     val priority: Int,
     val queuePosition: Long,
     val attempt: Int,

@@ -73,4 +73,11 @@
     <string name="notification_working">Download in progress</string>
     <string name="notification_progress">%1$d%% • %2$s</string>
     <string name="downloaded_of_total">%1$s of %2$s</string>
+    <string name="extractor_loading">Loading the extractor and reading source formats…</string>
+    <string name="source_formats_count">%1$d source formats — none hidden</string>
+    <string name="choose_audio_track">Choose the exact companion audio track</string>
+    <string name="back_to_formats">Back to all formats</string>
+    <string name="select_video_then_audio">Select video, then audio</string>
+    <string name="download_exact_format">Download this exact format</string>
+    <string name="recommended_for_device">Recommended for this device</string>
 </resources>

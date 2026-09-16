@@ -11,8 +11,8 @@ android {
         applicationId = "com.clickdownloader.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -44,6 +44,7 @@ android {
     }
 
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    packaging.jniLibs.useLegacyPackaging = true
 }
 
 kotlin {
@@ -55,6 +56,7 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:download"))
+    implementation(project(":core:extractor"))
     implementation(project(":core:storage"))
 
     implementation(platform(libs.compose.bom))

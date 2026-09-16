@@ -8,6 +8,7 @@ import com.clickdownloader.core.model.DuplicatePolicy
 import com.clickdownloader.core.model.FinalizedFile
 import com.clickdownloader.core.model.PartialFilePolicy
 import java.util.UUID
+import java.util.Base64
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -36,7 +37,8 @@ class RoomOutputFileRepository(private val dao: OutputFileDao) : OutputFileRepos
 
 private fun DownloadRequest.asEntity() = DownloadRequestEntity(
     jobId = jobId,
-    url = url,
+        url = url,
+        secondaryUrl = secondaryUrl,
     displayName = displayName,
     mimeType = mimeType,
     kind = kind.name,
@@ -46,6 +48,8 @@ private fun DownloadRequest.asEntity() = DownloadRequestEntity(
     temporaryPath = temporaryPath,
     outputUri = outputUri,
     supportsRanges = supportsRanges,
+    headersEncoded = headers.encodeHeaders(),
+    secondaryHeadersEncoded = secondaryHeaders.encodeHeaders(),
     priority = priority,
     queuePosition = queuePosition,
     attempt = attempt,
@@ -56,7 +60,8 @@ private fun DownloadRequest.asEntity() = DownloadRequestEntity(
 
 private fun DownloadRequestEntity.asModel() = DownloadRequest(
     jobId = jobId,
-    url = url,
+        url = url,
+        secondaryUrl = secondaryUrl,
     displayName = displayName,
     mimeType = mimeType,
     kind = DownloadKind.valueOf(kind),
@@ -66,6 +71,8 @@ private fun DownloadRequestEntity.asModel() = DownloadRequest(
     temporaryPath = temporaryPath,
     outputUri = outputUri,
     supportsRanges = supportsRanges,
+    headers = headersEncoded.decodeHeaders(),
+    secondaryHeaders = secondaryHeadersEncoded.decodeHeaders(),
     priority = priority,
     queuePosition = queuePosition,
     attempt = attempt,
@@ -73,3 +80,16 @@ private fun DownloadRequestEntity.asModel() = DownloadRequest(
     duplicatePolicy = DuplicatePolicy.valueOf(duplicatePolicy),
     partialFilePolicy = PartialFilePolicy.valueOf(partialFilePolicy),
 )
+
+private fun Map<String, String>.encodeHeaders(): String = entries.joinToString("\n") {
+    val encoder = Base64.getUrlEncoder().withoutPadding()
+    "${encoder.encodeToString(it.key.toByteArray())}:${encoder.encodeToString(it.value.toByteArray())}"
+}
+
+private fun String.decodeHeaders(): Map<String, String> {
+    val decoder = Base64.getUrlDecoder()
+    return lineSequence().filter(String::isNotBlank).associate { line ->
+        val (key, value) = line.split(':', limit = 2)
+        String(decoder.decode(key)) to String(decoder.decode(value))
+    }
+}

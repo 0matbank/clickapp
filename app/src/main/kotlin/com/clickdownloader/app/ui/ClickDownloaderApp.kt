@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -74,6 +75,8 @@ import com.clickdownloader.core.model.AppLanguage
 import com.clickdownloader.core.model.AppThemeMode
 import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.DownloadJobState
+import com.clickdownloader.core.model.FormatCompatibility
+import com.clickdownloader.core.model.MediaFormatOption
 
 private enum class Destination(
     val route: String,
@@ -158,11 +161,24 @@ fun ClickDownloaderApp(
                     onPaste = { viewModel.setInputUrl(readClipboardText(context)) },
                     onAnalyze = {
                         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        viewModel.analyzeDirect {
+                        viewModel.analyze {
                             DownloadService.start(context)
                             navController.navigate(Destination.DOWNLOADS.route)
                         }
                     },
+                    onFormatSelected = { format ->
+                        viewModel.selectFormat(format) {
+                            DownloadService.start(context)
+                            navController.navigate(Destination.DOWNLOADS.route)
+                        }
+                    },
+                    onAudioSelected = { format ->
+                        viewModel.selectCompanionAudio(format) {
+                            DownloadService.start(context)
+                            navController.navigate(Destination.DOWNLOADS.route)
+                        }
+                    },
+                    onBackToFormats = viewModel::backToFormats,
                 )
             }
             composable(Destination.DOWNLOADS.route) {
@@ -200,6 +216,9 @@ private fun HomeScreen(
     onUrlChanged: (String) -> Unit,
     onPaste: () -> Unit,
     onAnalyze: () -> Unit,
+    onFormatSelected: (MediaFormatOption) -> Unit,
+    onAudioSelected: (MediaFormatOption) -> Unit,
+    onBackToFormats: () -> Unit,
 ) {
     val active = state.jobs.firstOrNull { !it.state.isTerminal && it.state != DownloadJobState.FAILED }
     LazyColumn(
@@ -227,8 +246,44 @@ private fun HomeScreen(
                 OutlinedButton(onClick = onPaste, modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.paste))
                 }
-                Button(onClick = onAnalyze, modifier = Modifier.weight(1f)) {
+                Button(onClick = onAnalyze, enabled = !state.isAnalyzing && state.inputUrl.isNotBlank(), modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.analyze))
+                }
+            }
+        }
+        if (state.isAnalyzing) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.extractor_loading))
+                }
+            }
+        }
+        state.pendingSelection?.let { pending ->
+            item {
+                Text(pending.analysis.metadata.title, style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.source_formats_count, pending.analysis.formats.size))
+            }
+            val selectedVideo = state.selectedVideo
+            if (selectedVideo == null) {
+                val recommendedVideoId = pending.analysis.formats
+                    .filter { it.hasVideo && !it.drmProtected && it.compatibility != FormatCompatibility.TRANSCODE_REQUIRED }
+                    .maxByOrNull { (it.width ?: 0).toLong() * (it.height ?: 0) * 100 + (it.framesPerSecond ?: 0.0).toLong() }
+                    ?.formatId
+                val recommendedAudioId = pending.analysis.formats.filter { it.isAudioOnly && !it.drmProtected }
+                    .maxByOrNull { it.audioBitrate ?: 0L }?.formatId
+                items(pending.analysis.formats, key = { it.formatId }) { format ->
+                    FormatCard(format = format, recommended = format.formatId == recommendedVideoId || format.formatId == recommendedAudioId, onClick = { onFormatSelected(format) })
+                }
+            } else {
+                item {
+                    Text(stringResource(R.string.choose_audio_track), style = MaterialTheme.typography.titleMedium)
+                    Text(formatSummary(selectedVideo), style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = onBackToFormats) { Text(stringResource(R.string.back_to_formats)) }
+                }
+                items(pending.analysis.formats.filter(MediaFormatOption::isAudioOnly), key = { "audio-${it.formatId}" }) { audio ->
+                    val recommended = audio == pending.analysis.formats.filter(MediaFormatOption::isAudioOnly).maxByOrNull { it.audioBitrate ?: 0L }
+                    FormatCard(format = audio, recommended = recommended, onClick = { onAudioSelected(audio) })
                 }
             }
         }
@@ -247,6 +302,48 @@ private fun HomeScreen(
             item { EmptyJobs() }
         }
     }
+}
+
+@Composable
+private fun FormatCard(format: MediaFormatOption, recommended: Boolean, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(formatSummary(format), style = MaterialTheme.typography.titleSmall)
+            Text(
+                listOfNotNull(
+                    format.videoCodec,
+                    format.audioCodec,
+                    format.framesPerSecond?.let { "${it}fps" },
+                    format.dynamicRange,
+                    format.bitDepth?.let { "${it}-bit" },
+                    format.audioLanguage,
+                    format.estimatedBytes?.let(::humanSize),
+                ).joinToString(" • "),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(compatibilityLabel(format.compatibility), color = MaterialTheme.colorScheme.primary)
+            if (recommended) Text(stringResource(R.string.recommended_for_device), color = MaterialTheme.colorScheme.tertiary)
+            Button(onClick = onClick, enabled = !format.drmProtected) {
+                Text(if (format.hasVideo && !format.hasAudio) stringResource(R.string.select_video_then_audio) else stringResource(R.string.download_exact_format))
+            }
+        }
+    }
+}
+
+private fun formatSummary(format: MediaFormatOption): String = listOfNotNull(
+    format.height?.let { "${it}p" },
+    format.formatNote,
+    format.extension?.uppercase(),
+    format.formatId,
+    if (format.isAudioOnly) "audio-only" else null,
+).joinToString(" • ")
+
+private fun compatibilityLabel(value: FormatCompatibility): String = when (value) {
+    FormatCompatibility.DIRECT -> "Device compatible"
+    FormatCompatibility.REMUX_REQUIRED -> "Lossless remux required"
+    FormatCompatibility.TRANSCODE_REQUIRED -> "Conversion required"
+    FormatCompatibility.UNSUPPORTED_DRM -> "DRM protected — unavailable"
+    FormatCompatibility.UNKNOWN -> "Compatibility unknown"
 }
 
 private enum class DownloadTab(val labelRes: Int) {

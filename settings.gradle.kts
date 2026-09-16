@@ -22,5 +22,6 @@ include(
     ":core:domain",
     ":core:data",
     ":core:download",
+    ":core:extractor",
     ":core:storage",
 )

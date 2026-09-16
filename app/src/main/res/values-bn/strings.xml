@@ -73,4 +73,11 @@
     <string name="notification_working">Download চলছে</string>
     <string name="notification_progress">%1$d%% • %2$s</string>
     <string name="downloaded_of_total">%2$s-এর মধ্যে %1$s</string>
+    <string name="extractor_loading">এক্সট্র্যাক্টর চালু করে সোর্স ফরম্যাট পড়া হচ্ছে…</string>
+    <string name="source_formats_count">%1$dটি সোর্স ফরম্যাট — কোনোটি লুকানো নয়</string>
+    <string name="choose_audio_track">নির্দিষ্ট সঙ্গী অডিও ট্র্যাক বেছে নিন</string>
+    <string name="back_to_formats">সব ফরম্যাটে ফিরুন</string>
+    <string name="select_video_then_audio">ভিডিও, তারপর অডিও বাছুন</string>
+    <string name="download_exact_format">এই নির্দিষ্ট ফরম্যাট ডাউনলোড করুন</string>
+    <string name="recommended_for_device">এই ডিভাইসের জন্য প্রস্তাবিত</string>
 </resources>
