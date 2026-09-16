@@ -36,7 +36,7 @@ data class BatchPreparation(
     val allSizesKnown: Boolean = items.all { it.primary.estimatedBytes != null && (it.audio == null || it.audio.estimatedBytes != null) }
 }
 
-data class PendingMediaSelection(val jobId: String, val analysis: MediaAnalysis)
+data class PendingMediaSelection(val jobId: String, val analysis: MediaAnalysis, val sessionHost: String? = null)
 
 class AnalyzeExtractedMediaUseCase(
     private val jobs: DownloadJobRepository,
@@ -45,7 +45,7 @@ class AnalyzeExtractedMediaUseCase(
     private val appVersion: String,
     private val playlists: PlaylistRepository? = null,
 ) {
-    suspend operator fun invoke(url: String, cookieFilePath: String? = null): PendingMediaSelection {
+    suspend operator fun invoke(url: String, cookieFilePath: String? = null, sessionHost: String? = null): PendingMediaSelection {
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         jobs.upsert(DownloadJob(id, url, url, DownloadJobState.CREATED, now, now, appVersion = appVersion, engineVersion = extractor.engineVersion()))
@@ -61,7 +61,7 @@ class AnalyzeExtractedMediaUseCase(
             if (analysis.isPlaylist) playlists?.savePlaylist(id, url, analysis.metadata.title, analysis.playlistItems)
             jobs.upsert(jobs.findById(id)!!.copy(displayTitle = analysis.metadata.title, engineVersion = extractor.engineVersion()))
             jobs.updateState(id, DownloadJobState.WAITING_FOR_SELECTION)
-            PendingMediaSelection(id, analysis)
+            PendingMediaSelection(id, analysis, sessionHost)
         } catch (error: Throwable) {
             jobs.updateState(id, DownloadJobState.FAILED, "EXTRACTION_FAILED", error.message)
             throw error
@@ -77,12 +77,14 @@ class PreparePlaylistBatchUseCase(
         items: List<com.clickdownloader.core.model.PlaylistItem>,
         selectedIds: Set<String>,
         rule: BatchQualityRule,
+        cookieFilePath: String? = null,
+        sessionHost: String? = null,
     ): BatchPreparation {
         val prepared = mutableListOf<PreparedBatchItem>()
         val failures = mutableListOf<String>()
         items.filter { it.id in selectedIds }.forEach { item ->
             runCatching {
-                val pending = analyze(item.sourceUrl)
+                val pending = analyze(item.sourceUrl, cookieFilePath, sessionHost)
                 val formats = pending.analysis.formats.filterNot { it.drmProtected }
                 val audioOnly = formats.filter(MediaFormatOption::isAudioOnly).maxByOrNull { it.audioBitrate ?: 0L }
                 val primary = when (rule) {
@@ -189,6 +191,7 @@ class QueueExactFormatUseCase(
                 headers = primary.httpHeaders,
                 secondaryHeaders = audio?.httpHeaders.orEmpty(),
                 queuePosition = System.currentTimeMillis(),
+                sessionHost = pending.sessionHost,
             ),
         )
         jobs.updateState(pending.jobId, DownloadJobState.QUEUED)

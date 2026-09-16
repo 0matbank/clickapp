@@ -72,6 +72,7 @@ import com.clickdownloader.app.MainUiState
 import com.clickdownloader.app.MainViewModel
 import com.clickdownloader.app.R
 import com.clickdownloader.app.UiMessage
+import com.clickdownloader.app.BrowserActivity
 import com.clickdownloader.app.download.DownloadService
 import com.clickdownloader.core.model.AppLanguage
 import com.clickdownloader.core.model.AppThemeMode
@@ -193,6 +194,9 @@ fun ClickDownloaderApp(
                         }
                     },
                     onDismissBatch = viewModel::dismissBatchConfirmation,
+                    onOpenBrowser = { incognito ->
+                        context.startActivity(Intent(context, BrowserActivity::class.java).putExtra(BrowserActivity.EXTRA_INCOGNITO, incognito))
+                    },
                 )
             }
             composable(Destination.DOWNLOADS.route) {
@@ -240,6 +244,7 @@ private fun HomeScreen(
     onPrepareBatch: () -> Unit,
     onConfirmBatch: () -> Unit,
     onDismissBatch: () -> Unit,
+    onOpenBrowser: (Boolean) -> Unit,
 ) {
     val active = state.jobs.firstOrNull { !it.state.isTerminal && it.state != DownloadJobState.FAILED }
     LazyColumn(
@@ -348,6 +353,12 @@ private fun HomeScreen(
             }
         }
         item { Text(stringResource(R.string.share_instruction), style = MaterialTheme.typography.bodySmall) }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = { onOpenBrowser(false) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.open_browser)) }
+                OutlinedButton(onClick = { onOpenBrowser(true) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.open_incognito)) }
+            }
+        }
         active?.let { job ->
             item {
                 Text(stringResource(R.string.active_jobs), style = MaterialTheme.typography.titleMedium)

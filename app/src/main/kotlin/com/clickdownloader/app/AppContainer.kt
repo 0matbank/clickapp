@@ -20,6 +20,8 @@ import com.clickdownloader.core.download.DirectMediaProbe
 import com.clickdownloader.core.download.HttpDirectDownloader
 import com.clickdownloader.core.extractor.YtDlpExtractor
 import com.clickdownloader.core.media.YtDlpAdaptiveMediaProcessor
+import com.clickdownloader.core.browser.SessionCookieExporter
+import com.clickdownloader.core.browser.SessionVault
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
@@ -78,4 +80,7 @@ class AppContainer(context: Context) {
 
     val directMediaProbe: DirectMediaProbe by lazy { DirectMediaProbe(httpClient) }
     val directDownloader: HttpDirectDownloader by lazy { HttpDirectDownloader(httpClient) }
+
+    fun exportBrowserSession(host: String): String? = SessionVault(appContext).restore(host)
+        ?.let { SessionCookieExporter(appContext).export(host, it).absolutePath }
 }

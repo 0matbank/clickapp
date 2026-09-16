@@ -28,6 +28,9 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".BrowserActivity"
+            android:exported="false" />
+        <activity
             android:name=".QuickAnalyzeActivity"
             android:excludeFromRecents="true"
             android:exported="true"

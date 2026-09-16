@@ -68,6 +68,7 @@ interface AdaptiveMediaProcessor {
         exactFormatSpec: String,
         workingDirectory: File,
         preferredContainer: String?,
+        cookieFilePath: String? = null,
         onProgress: suspend (MediaProcessProgress) -> Unit,
         onCheckpoint: suspend (FragmentCheckpoint) -> Unit,
     ): ProcessedMediaArtifact

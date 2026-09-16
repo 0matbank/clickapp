@@ -27,6 +27,7 @@ data class DownloadRequest(
     val maxAttempts: Int = 5,
     val duplicatePolicy: DuplicatePolicy = DuplicatePolicy.KEEP_BOTH,
     val partialFilePolicy: PartialFilePolicy = PartialFilePolicy.KEEP,
+    val sessionHost: String? = null,
 ) {
     init {
         require(jobId.isNotBlank())

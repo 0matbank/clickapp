@@ -25,4 +25,5 @@ include(
     ":core:extractor",
     ":core:media",
     ":core:storage",
+    ":core:browser",
 )

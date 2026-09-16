@@ -94,4 +94,18 @@
     <string name="batch_partial">প্রস্তুত আইটেমগুলো কিউ হয়েছে; ব্যর্থ আইটেমগুলো আলাদা রাখা হয়েছে।</string>
     <string name="stop_and_save">থামিয়ে সংরক্ষণ</string>
     <string name="job_playlist_queued">প্লেলিস্ট আইটেমগুলো আলাদাভাবে কিউ হয়েছে</string>
+    <string name="open_browser">ব্রাউজার</string>
+    <string name="open_incognito">ইনকগনিটো</string>
+    <string name="browser_address_hint">ঠিকানা বা সার্চ</string>
+    <string name="browser_home">হোম</string>
+    <string name="browser_analyze_page">পেজ বিশ্লেষণ</string>
+    <string name="browser_use_session">Extract করতে login session ব্যবহার</string>
+    <string name="browser_desktop">ডেস্কটপ/মোবাইল</string>
+    <string name="browser_share">শেয়ার</string>
+    <string name="browser_copy">কপি</string>
+    <string name="browser_clear_site">সাইট মুছুন</string>
+    <string name="browser_clear_all">সব session মুছুন</string>
+    <string name="browser_incognito_active">ইনকগনিটো: বের হলে cookie মুছবে</string>
+    <string name="browser_session_encrypted">Login session encrypted</string>
+    <string name="browser_detected_media">Downloadযোগ্য media — বিশ্লেষণ করতে tap করুন</string>
 </resources>

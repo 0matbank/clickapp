@@ -102,7 +102,9 @@ class DownloadService : Service() {
         }
         val downloadState = if (request.mimeType?.startsWith("audio/") == true) DownloadJobState.DOWNLOADING_AUDIO else DownloadJobState.DOWNLOADING_VIDEO
         jobs.updateState(job.id, downloadState)
+        var sessionCookieFile: File? = null
         try {
+            sessionCookieFile = request.sessionHost?.let(container::exportBrowserSession)?.let(::File)
             val artifactFile: File
             val verifiedSize: Long
             val sidecars: List<String>
@@ -131,6 +133,7 @@ class DownloadService : Service() {
                     exactFormatSpec = selected.formatId,
                     workingDirectory = workDirectory,
                     preferredContainer = selected.container,
+                    cookieFilePath = sessionCookieFile?.absolutePath,
                     onProgress = { mediaProgress ->
                         when (control.get()) {
                             DownloadControl.Pause, DownloadControl.Cancel -> container.adaptiveMediaProcessor.cancel(job.id)
@@ -182,6 +185,7 @@ class DownloadService : Service() {
                 DownloadControl.Continue -> handleFailure(request, classifyProcessingFailure(error))
             }
         } finally {
+            sessionCookieFile?.delete()
             activeJobId.compareAndSet(job.id, null)
             activeIsLive.set(false)
         }

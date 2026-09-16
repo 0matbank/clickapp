@@ -17,6 +17,7 @@ class YtDlpMediaCommandTest {
             workingDirectory = directory,
             jobId = "job",
             preferredContainer = "mkv",
+            cookieFilePath = "/private/session-cookie.txt",
         ).buildCommand()
 
         assertEquals("401+251", command[command.indexOf("--format") + 1])
@@ -26,6 +27,7 @@ class YtDlpMediaCommandTest {
         assertTrue("--embed-metadata" in command)
         assertTrue("--embed-thumbnail" in command)
         assertTrue("--embed-subs" in command)
+        assertEquals("/private/session-cookie.txt", command[command.indexOf("--cookies") + 1])
         assertFalse(command.any { it.contains("/") && it.contains("best") })
         directory.deleteRecursively()
     }

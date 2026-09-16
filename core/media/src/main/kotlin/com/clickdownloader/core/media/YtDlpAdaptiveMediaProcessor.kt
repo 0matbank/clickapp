@@ -23,12 +23,13 @@ class YtDlpAdaptiveMediaProcessor(context: Context) : AdaptiveMediaProcessor {
         exactFormatSpec: String,
         workingDirectory: File,
         preferredContainer: String?,
+        cookieFilePath: String?,
         onProgress: suspend (MediaProcessProgress) -> Unit,
         onCheckpoint: suspend (FragmentCheckpoint) -> Unit,
     ): ProcessedMediaArtifact = withContext(Dispatchers.IO) {
         ensureInitialized()
         workingDirectory.mkdirs()
-        val request = YtDlpMediaCommand.build(sourceUrl, exactFormatSpec, workingDirectory, jobId, preferredContainer)
+        val request = YtDlpMediaCommand.build(sourceUrl, exactFormatSpec, workingDirectory, jobId, preferredContainer, cookieFilePath)
         try {
             YoutubeDL.getInstance().execute(request, jobId) { percent, eta, line ->
                 runBlocking {
@@ -100,6 +101,7 @@ object YtDlpMediaCommand {
         workingDirectory: File,
         jobId: String,
         preferredContainer: String?,
+        cookieFilePath: String? = null,
     ): YoutubeDLRequest = YoutubeDLRequest(sourceUrl).apply {
         addOption("--no-playlist")
         addOption("--format", exactFormatSpec)
@@ -117,6 +119,7 @@ object YtDlpMediaCommand {
         addOption("--sub-langs", "all")
         addOption("--write-info-json")
         if (preferredContainer in setOf("mp4", "mkv", "webm")) addOption("--merge-output-format", preferredContainer!!)
+        if (cookieFilePath != null) addOption("--cookies", cookieFilePath)
     }
 }
 

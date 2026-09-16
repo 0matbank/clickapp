@@ -196,4 +196,5 @@ data class DownloadRequestEntity(
     val maxAttempts: Int,
     val duplicatePolicy: String,
     val partialFilePolicy: String,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val sessionHost: String? = null,
 )

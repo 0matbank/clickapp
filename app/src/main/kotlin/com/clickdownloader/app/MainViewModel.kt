@@ -62,6 +62,7 @@ class MainViewModel(
     private val queueExactFormat: QueueExactFormatUseCase,
     private val preparePlaylistBatch: PreparePlaylistBatchUseCase,
     private val confirmPlaylistBatch: ConfirmPlaylistBatchUseCase,
+    private val exportSessionCookie: (String) -> String?,
 ) : ViewModel() {
     private val inputUrl = MutableStateFlow("")
     private val message = MutableStateFlow<UiMessage?>(null)
@@ -93,7 +94,7 @@ class MainViewModel(
         message.value = null
     }
 
-    fun analyze(onQueued: (String) -> Unit) {
+    fun analyze(sessionHost: String? = null, onQueued: (String) -> Unit) {
         if (selection.value.loading) return
         viewModelScope.launch {
             selection.value = SelectionState(loading = true)
@@ -102,7 +103,10 @@ class MainViewModel(
                 finishQueue(direct.getOrThrow(), onQueued)
                 return@launch
             }
-            runCatching { analyzeExtracted(inputUrl.value) }
+            val cookieFilePath = sessionHost?.let(exportSessionCookie)
+            val result = runCatching { analyzeExtracted(inputUrl.value, cookieFilePath, sessionHost) }
+            cookieFilePath?.let { java.io.File(it).delete() }
+            result
                 .onSuccess {
                     selection.value = SelectionState(
                         pending = it,
@@ -146,9 +150,11 @@ class MainViewModel(
         if (current.selectedPlaylistIds.isEmpty() || current.loading) return
         viewModelScope.launch {
             selection.value = current.copy(loading = true)
+            val cookieFilePath = pending.sessionHost?.let(exportSessionCookie)
             val result = runCatching {
-                preparePlaylistBatch(pending.jobId, pending.analysis.playlistItems, current.selectedPlaylistIds, current.batchRule)
+                preparePlaylistBatch(pending.jobId, pending.analysis.playlistItems, current.selectedPlaylistIds, current.batchRule, cookieFilePath, pending.sessionHost)
             }
+            cookieFilePath?.let { java.io.File(it).delete() }
             selection.value = selection.value.copy(loading = false, batchPreparation = result.getOrNull())
             if (result.isFailure) message.value = UiMessage.ANALYZE_FAILED
         }
@@ -223,6 +229,7 @@ class MainViewModel(
                     queue,
                     PreparePlaylistBatchUseCase(analyze),
                     ConfirmPlaylistBatchUseCase(queue, container.playlistRepository, container.downloadJobRepository),
+                    container::exportBrowserSession,
                 ) as T
             }
         }

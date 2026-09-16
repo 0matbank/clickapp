@@ -55,7 +55,8 @@ private fun DownloadRequest.asEntity() = DownloadRequestEntity(
     attempt = attempt,
     maxAttempts = maxAttempts,
     duplicatePolicy = duplicatePolicy.name,
-    partialFilePolicy = partialFilePolicy.name,
+        partialFilePolicy = partialFilePolicy.name,
+        sessionHost = sessionHost,
 )
 
 private fun DownloadRequestEntity.asModel() = DownloadRequest(
@@ -78,7 +79,8 @@ private fun DownloadRequestEntity.asModel() = DownloadRequest(
     attempt = attempt,
     maxAttempts = maxAttempts,
     duplicatePolicy = DuplicatePolicy.valueOf(duplicatePolicy),
-    partialFilePolicy = PartialFilePolicy.valueOf(partialFilePolicy),
+        partialFilePolicy = PartialFilePolicy.valueOf(partialFilePolicy),
+        sessionHost = sessionHost,
 )
 
 private fun Map<String, String>.encodeHeaders(): String = entries.joinToString("\n") {

@@ -94,4 +94,18 @@
     <string name="batch_partial">Available items were queued; failed playlist items stayed isolated.</string>
     <string name="stop_and_save">Stop &amp; save</string>
     <string name="job_playlist_queued">Playlist items queued independently</string>
+    <string name="open_browser">Browser</string>
+    <string name="open_incognito">Incognito</string>
+    <string name="browser_address_hint">Address or search</string>
+    <string name="browser_home">Home</string>
+    <string name="browser_analyze_page">Analyze page</string>
+    <string name="browser_use_session">Use login for extraction</string>
+    <string name="browser_desktop">Desktop/mobile</string>
+    <string name="browser_share">Share</string>
+    <string name="browser_copy">Copy</string>
+    <string name="browser_clear_site">Clear site</string>
+    <string name="browser_clear_all">Clear all</string>
+    <string name="browser_incognito_active">Incognito: cookies clear on exit</string>
+    <string name="browser_session_encrypted">Login sessions are encrypted</string>
+    <string name="browser_detected_media">Detected downloadable media — tap to analyze</string>
 </resources>

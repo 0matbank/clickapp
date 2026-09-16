@@ -45,6 +45,18 @@ Phase 5 — Playlist, Batch and Live is complete:
 - Non-DRM live capture over supported extractor streams with explicit **Stop & Save**
 - Interrupted MPEG-TS live capture finalized by FFmpeg stream-copy and verified for both video and audio
 
+Phase 6 — Built-in Browser and Session is complete:
+
+- Optional Browser/Incognito entry points; WebView is created only inside `BrowserActivity`
+- Address/search, back, forward, refresh, home, desktop/mobile user-agent, share and copy controls
+- Downloadable media request detection for common direct, HLS and DASH media
+- Login session support with per-site/all-session clear controls and incognito cleanup
+- AES-GCM Android Keystore session vault under no-backup storage; cookies and passwords are never stored in Room or logs
+- User-controlled **Use login for extraction** bridge; only the non-secret host is persisted with a job
+- Private plaintext cookie files exist only around extractor execution and are immediately deleted
+- WebView teardown (`stopLoading`, blank navigation, history/view removal and `destroy`) verified on API 37
+- Sensitive headers and signed query parameters are redacted from detected-media display and diagnostic text
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:
@@ -60,7 +72,7 @@ Phase 1 — App Foundation:
 - Debug and minified release build types
 - Unit and instrumented-test foundations
 
-Authenticated browser/session handling is introduced in Phase 6.
+Browser/session handling is available through the optional Browser buttons on Home.
 
 ## Prerequisites
 
@@ -102,4 +114,4 @@ The app asks for a download directory only when the user selects **Choose folder
 
 ## Known limits
 
-Phase 5 accepts direct media URLs, supported public web pages, separate audio/video sources, HLS/DASH representations, supported playlists and non-DRM live streams. A live source can still fail when a site requires authentication, blocks the extractor, expires the manifest, or uses DRM. Authenticated browser sessions are handled by Phase 6. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.
+Phase 6 accepts direct media URLs, supported public web pages, separate audio/video sources, HLS/DASH representations, supported playlists, non-DRM live streams and extractor-supported login sessions. A source can still fail because of DRM, CAPTCHA, geo-blocking, rate limits, expired manifests or website changes. The browser detects observable media requests; it cannot promise access to encrypted media. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.
