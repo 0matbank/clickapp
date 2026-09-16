@@ -57,6 +57,14 @@ Phase 6 — Built-in Browser and Session is complete:
 - WebView teardown (`stopLoading`, blank navigation, history/view removal and `destroy`) verified on API 37
 - Sensitive headers and signed query parameters are redacted from detected-media display and diagnostic text
 
+Phase 7 — Floating Bubble is complete:
+
+- Explicit, on-demand overlay permission onboarding; the service is never started while disabled
+- Draggable shortcut with edge snap, rotation-safe saved position, opacity and size controls
+- Tap-to-analyze for a user-copied HTTP(S) link and long-press-to-disable
+- Optional foreground-app allowlist through a narrowly scoped accessibility service that cannot read window content
+- Clear Copy Link / Android Share fallback when clipboard or accessibility assistance is unavailable
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:

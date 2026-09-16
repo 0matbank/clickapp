@@ -41,7 +41,7 @@ data class MainUiState(
     val liveJobIds: Set<String> = emptySet(),
 )
 
-enum class UiMessage { INVALID_URL, ANALYZE_FAILED, DOWNLOAD_QUEUED, BATCH_PARTIAL, FOLDER_SAVED, FOLDER_ERROR }
+enum class UiMessage { INVALID_URL, ANALYZE_FAILED, DOWNLOAD_QUEUED, BATCH_PARTIAL, FOLDER_SAVED, FOLDER_ERROR, BUBBLE_SHARE_FALLBACK }
 
 private data class SelectionState(
     val pending: PendingMediaSelection? = null,
@@ -193,6 +193,12 @@ class MainViewModel(
     fun setLanguage(value: AppLanguage) { viewModelScope.launch { settings.setLanguage(value) } }
     fun setTheme(value: AppThemeMode) { viewModelScope.launch { settings.setThemeMode(value) } }
     fun setAskQualityEveryTime(value: Boolean) { viewModelScope.launch { settings.setAskQualityEveryTime(value) } }
+    fun setBubbleEnabled(value: Boolean) { viewModelScope.launch { settings.setBubbleEnabled(value) } }
+    fun setBubbleOpacity(value: Float) { viewModelScope.launch { settings.setBubbleOpacity(value) } }
+    fun setBubbleSizeDp(value: Int) { viewModelScope.launch { settings.setBubbleSizeDp(value) } }
+    fun setBubbleAllowlist(value: Set<String>) { viewModelScope.launch { settings.setBubbleAllowlistedPackages(value) } }
+    fun setAccessibilityBubbleAssist(value: Boolean) { viewModelScope.launch { settings.setAccessibilityBubbleAssist(value) } }
+    fun showBubbleFallback() { message.value = UiMessage.BUBBLE_SHARE_FALLBACK }
 
     fun selectDownloadDirectory(uri: String) {
         viewModelScope.launch {

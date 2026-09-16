@@ -108,4 +108,20 @@
     <string name="browser_incognito_active">ইনকগনিটো: বের হলে cookie মুছবে</string>
     <string name="browser_session_encrypted">Login session encrypted</string>
     <string name="browser_detected_media">Downloadযোগ্য media — বিশ্লেষণ করতে tap করুন</string>
+    <string name="settings_bubble">ফ্লোটিং ডাউনলোড বাবল</string>
+    <string name="enable_bubble">ফ্লোটিং বাবল চালু করুন</string>
+    <string name="bubble_privacy_explanation">বাবল অন্য অ্যাপের URL নিজে পড়তে পারে না। কপি করা URL বিশ্লেষণ করতে বাবলে চাপুন, অথবা Share ব্যবহার করুন। চালু করলেই শুধু overlay permission চাওয়া হবে।</string>
+    <string name="bubble_opacity">স্বচ্ছতা: %1$d%%</string>
+    <string name="bubble_size">আকার: %1$d dp</string>
+    <string name="bubble_allowlist">নির্বাচিত অ্যাপের ওপর দেখান</string>
+    <string name="bubble_allowlist_help">Accessibility সহায়তা বন্ধ থাকলে বাবল সব জায়গায় দেখা যাবে। তালিকা কার্যকর করতে অ্যাপ বেছে নিয়ে সহায়তা স্পষ্টভাবে চালু করুন।</string>
+    <string name="bubble_accessibility_assist">Accessibility দিয়ে অ্যাপ ফিল্টার</string>
+    <string name="bubble_accessibility_warning">ঐচ্ছিক। শুধু foreground package-এর নাম জানায়; screen content বা password পড়ে না এবং control automate করে না। কাজ না করলে Copy Link বা Share ব্যবহার করুন।</string>
+    <string name="bubble_accessibility_label">Click Downloader বাবল সহায়তা</string>
+    <string name="bubble_accessibility_description">ব্যবহারকারী নির্বাচিত অ্যাপেই ফ্লোটিং বাবল সীমিত রাখে। Screen text বা password পড়া হয় না।</string>
+    <string name="bubble_content_description">Click Downloader ফ্লোটিং শর্টকাট</string>
+    <string name="bubble_channel_name">ফ্লোটিং বাবল</string>
+    <string name="bubble_notification_title">ডাউনলোড বাবল চালু আছে</string>
+    <string name="bubble_notification_body">Media link কপি করে বাবলে চাপুন; বন্ধ করতে long-press করুন।</string>
+    <string name="bubble_share_fallback">Clipboard-এ web link নেই। Media link কপি করুন অথবা Share → Click Downloader ব্যবহার করুন।</string>
 </resources>

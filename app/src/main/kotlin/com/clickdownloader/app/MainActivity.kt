@@ -18,12 +18,14 @@ class MainActivity : AppCompatActivity() {
     private var incomingUrl by mutableStateOf<String?>(null)
     private var autoAnalyze by mutableStateOf(false)
     private var incomingSessionHost by mutableStateOf<String?>(null)
+    private var bubbleFallback by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         incomingUrl = intent.getStringExtra(EXTRA_URL)
         autoAnalyze = intent.getBooleanExtra(EXTRA_AUTO_ANALYZE, false)
         incomingSessionHost = validatedSessionHost(intent.getStringExtra(EXTRA_SESSION_HOST))
+        bubbleFallback = intent.getBooleanExtra(EXTRA_BUBBLE_FALLBACK, false)
         val container = (application as ClickDownloaderApplication).container
         setContent {
             val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(container))
@@ -32,6 +34,10 @@ class MainActivity : AppCompatActivity() {
                 incomingUrl?.let {
                     viewModel.setInputUrl(it)
                     if (autoAnalyze) viewModel.analyze(incomingSessionHost) { DownloadService.start(this@MainActivity) }
+                }
+                if (bubbleFallback) {
+                    viewModel.showBubbleFallback()
+                    bubbleFallback = false
                 }
             }
             ClickDownloaderTheme(themeMode = state.settings.themeMode) {
@@ -46,6 +52,7 @@ class MainActivity : AppCompatActivity() {
         incomingUrl = intent.getStringExtra(EXTRA_URL)
         autoAnalyze = intent.getBooleanExtra(EXTRA_AUTO_ANALYZE, false)
         incomingSessionHost = validatedSessionHost(intent.getStringExtra(EXTRA_SESSION_HOST))
+        bubbleFallback = intent.getBooleanExtra(EXTRA_BUBBLE_FALLBACK, false)
     }
 
     private fun validatedSessionHost(host: String?): String? = host?.lowercase()
@@ -55,5 +62,6 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_URL = "incoming_url"
         const val EXTRA_AUTO_ANALYZE = "auto_analyze"
         const val EXTRA_SESSION_HOST = "session_host"
+        const val EXTRA_BUBBLE_FALLBACK = "bubble_fallback"
     }
 }

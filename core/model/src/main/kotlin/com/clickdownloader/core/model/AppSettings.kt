@@ -18,5 +18,9 @@ data class AppSettings(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val askQualityEveryTime: Boolean = true,
     val downloadDirectoryUri: String? = null,
+    val bubbleEnabled: Boolean = false,
+    val bubbleOpacity: Float = 0.9f,
+    val bubbleSizeDp: Int = 56,
+    val bubbleAllowlistedPackages: Set<String> = emptySet(),
+    val accessibilityBubbleAssist: Boolean = false,
 )
-

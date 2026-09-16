@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.clickdownloader.core.domain.SettingsRepository
@@ -39,6 +42,11 @@ class DataStoreSettingsRepository(
                     ?: AppThemeMode.SYSTEM,
                 askQualityEveryTime = preferences[Keys.ASK_QUALITY] ?: true,
                 downloadDirectoryUri = preferences[Keys.DOWNLOAD_DIRECTORY],
+                bubbleEnabled = preferences[Keys.BUBBLE_ENABLED] ?: false,
+                bubbleOpacity = (preferences[Keys.BUBBLE_OPACITY] ?: 0.9f).coerceIn(0.35f, 1f),
+                bubbleSizeDp = (preferences[Keys.BUBBLE_SIZE] ?: 56).coerceIn(40, 80),
+                bubbleAllowlistedPackages = preferences[Keys.BUBBLE_ALLOWLIST].orEmpty(),
+                accessibilityBubbleAssist = preferences[Keys.BUBBLE_ACCESSIBILITY] ?: false,
             )
         }
 
@@ -61,15 +69,40 @@ class DataStoreSettingsRepository(
         }
     }
 
+    override suspend fun setBubbleEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.BUBBLE_ENABLED] = enabled }
+    }
+
+    override suspend fun setBubbleOpacity(opacity: Float) {
+        dataStore.edit { it[Keys.BUBBLE_OPACITY] = opacity.coerceIn(0.35f, 1f) }
+    }
+
+    override suspend fun setBubbleSizeDp(sizeDp: Int) {
+        dataStore.edit { it[Keys.BUBBLE_SIZE] = sizeDp.coerceIn(40, 80) }
+    }
+
+    override suspend fun setBubbleAllowlistedPackages(packages: Set<String>) {
+        dataStore.edit { it[Keys.BUBBLE_ALLOWLIST] = packages.map(String::trim).filter(PACKAGE_PATTERN::matches).toSet() }
+    }
+
+    override suspend fun setAccessibilityBubbleAssist(enabled: Boolean) {
+        dataStore.edit { it[Keys.BUBBLE_ACCESSIBILITY] = enabled }
+    }
+
     private object Keys {
         val LANGUAGE = stringPreferencesKey("language")
         val THEME = stringPreferencesKey("theme")
         val ASK_QUALITY = booleanPreferencesKey("ask_quality_every_time")
         val DOWNLOAD_DIRECTORY = stringPreferencesKey("download_directory_uri")
+        val BUBBLE_ENABLED = booleanPreferencesKey("bubble_enabled")
+        val BUBBLE_OPACITY = floatPreferencesKey("bubble_opacity")
+        val BUBBLE_SIZE = intPreferencesKey("bubble_size_dp")
+        val BUBBLE_ALLOWLIST = stringSetPreferencesKey("bubble_allowlisted_packages")
+        val BUBBLE_ACCESSIBILITY = booleanPreferencesKey("bubble_accessibility_assist")
     }
 
     private companion object {
         const val FILE_NAME = "click_downloader_settings.preferences_pb"
+        val PACKAGE_PATTERN = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
     }
 }
-

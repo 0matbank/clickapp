@@ -108,4 +108,20 @@
     <string name="browser_incognito_active">Incognito: cookies clear on exit</string>
     <string name="browser_session_encrypted">Login sessions are encrypted</string>
     <string name="browser_detected_media">Detected downloadable media — tap to analyze</string>
+    <string name="settings_bubble">Floating download bubble</string>
+    <string name="enable_bubble">Enable floating bubble</string>
+    <string name="bubble_privacy_explanation">The bubble cannot read another app’s URL. Tap it to analyze a URL you copied, or use the app’s Share action. Overlay permission is requested only when enabled.</string>
+    <string name="bubble_opacity">Opacity: %1$d%%</string>
+    <string name="bubble_size">Size: %1$d dp</string>
+    <string name="bubble_allowlist">Show over selected apps</string>
+    <string name="bubble_allowlist_help">With accessibility assistance off, the bubble remains visible everywhere. Select apps and explicitly enable assistance to enforce this list.</string>
+    <string name="bubble_accessibility_assist">Accessibility-assisted app filtering</string>
+    <string name="bubble_accessibility_warning">Optional. Reports only the foreground package name; it does not read screen content or automate controls. If unavailable, Copy Link or Share still works.</string>
+    <string name="bubble_accessibility_label">Click Downloader bubble assistance</string>
+    <string name="bubble_accessibility_description">Optionally limits the floating download bubble to apps selected by the user. No screen text or passwords are read.</string>
+    <string name="bubble_content_description">Click Downloader floating shortcut</string>
+    <string name="bubble_channel_name">Floating bubble</string>
+    <string name="bubble_notification_title">Download bubble is active</string>
+    <string name="bubble_notification_body">Tap the bubble after copying a media link; long-press it to close.</string>
+    <string name="bubble_share_fallback">No web link is available in the clipboard. Copy the media link or use Share → Click Downloader.</string>
 </resources>

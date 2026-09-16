@@ -82,6 +82,11 @@ interface SettingsRepository {
     suspend fun setThemeMode(themeMode: AppThemeMode)
     suspend fun setAskQualityEveryTime(enabled: Boolean)
     suspend fun setDownloadDirectoryUri(uri: String?)
+    suspend fun setBubbleEnabled(enabled: Boolean)
+    suspend fun setBubbleOpacity(opacity: Float)
+    suspend fun setBubbleSizeDp(sizeDp: Int)
+    suspend fun setBubbleAllowlistedPackages(packages: Set<String>)
+    suspend fun setAccessibilityBubbleAssist(enabled: Boolean)
 }
 
 interface StorageGateway {
