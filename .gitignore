@@ -12,6 +12,8 @@ local.properties
 *.keystore
 keystore.properties
 secrets.properties
+dist/*.apk
+dist/*.idsig
 
 # Native/runtime packages are acquired outside the repository
 .cxx/
@@ -21,4 +23,3 @@ external-toolchains/
 # OS files
 .DS_Store
 Thumbs.db
-

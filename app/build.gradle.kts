@@ -1,7 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+val releaseSigningProperties = providers.gradleProperty("clickDownloaderKeystoreProperties")
+    .orElse(providers.environmentVariable("CLICK_DOWNLOADER_KEYSTORE_PROPERTIES"))
+    .orNull
+    ?.let(::file)
+    ?.takeIf { it.isFile }
+    ?.let { propertiesFile ->
+        Properties().apply { propertiesFile.inputStream().use(::load) }
+    }
 
 android {
     namespace = "com.clickdownloader.app"
@@ -11,11 +22,26 @@ android {
         applicationId = "com.clickdownloader.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = providers.gradleProperty("clickVersionCode").orElse("10").get().toInt()
+        versionName = providers.gradleProperty("clickVersionName").orElse("1.0.0").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        releaseSigningProperties?.let { signing ->
+            create("externalRelease") {
+                storeFile = file(requireNotNull(signing.getProperty("storeFile")) { "Missing storeFile" })
+                storePassword = requireNotNull(signing.getProperty("storePassword")) { "Missing storePassword" }
+                keyAlias = requireNotNull(signing.getProperty("keyAlias")) { "Missing keyAlias" }
+                keyPassword = requireNotNull(signing.getProperty("keyPassword")) { "Missing keyPassword" }
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
     }
 
     buildTypes {
@@ -26,6 +52,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("externalRelease")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

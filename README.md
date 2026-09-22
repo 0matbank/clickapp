@@ -86,6 +86,13 @@ Phase 9 — Optimization and Hardening is complete:
 
 Measured API 37 AVD results are in [`docs/performance-report.md`](docs/performance-report.md). They are diagnostic only; no physical-phone battery, heat, low-RAM or performance claim is made.
 
+Phase 10 — Personal Release is implemented:
+
+- Versioned 1.0.0 / versionCode 10 release with external signing only
+- Signed, minified per-ABI and universal APK generation
+- Certificate verification, SHA-256 recording and signed v9→v10 emulator update test
+- Changelog plus signing-key backup and recovery procedure
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:
@@ -135,7 +142,7 @@ Run connected UI tests only with an emulator or physical device attached:
 
 ## Signing
 
-No signing key belongs in this repository. Phase 10 will read release signing values from an external, ignored `keystore.properties` file or environment/CI secrets. Losing the private signing key prevents same-package updates, so encrypted offline backups are required before personal release.
+No signing key belongs in this repository. Pass an external properties path using `-PclickDownloaderKeystoreProperties=C:\private\keystore.properties` or `CLICK_DOWNLOADER_KEYSTORE_PROPERTIES`. See [`docs/signing-and-recovery.md`](docs/signing-and-recovery.md). Losing the private key prevents same-package updates, so an encrypted off-device backup is required.
 
 ## Storage and privacy
 
@@ -143,4 +150,4 @@ The app asks for a download directory only when the user selects **Choose folder
 
 ## Known limits
 
-Phase 6 accepts direct media URLs, supported public web pages, separate audio/video sources, HLS/DASH representations, supported playlists, non-DRM live streams and extractor-supported login sessions. A source can still fail because of DRM, CAPTCHA, geo-blocking, rate limits, expired manifests or website changes. The browser detects observable media requests; it cannot promise access to encrypted media. Android 8/9 requires the user to choose a SAF output folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore.
+The app accepts direct media URLs, extractor-supported public pages and login sessions, separate audio/video sources, HLS/DASH representations, playlists and supported non-DRM live streams. A source can still fail because of DRM, CAPTCHA, geo-blocking, rate limits, removed/private media or website changes. It does not bypass those controls. The browser detects observable media requests; it cannot access encrypted media. Android 8/9 requires a user-selected SAF folder; Android 10+ defaults to `Downloads/Click Downloader` through MediaStore. Physical-phone performance, battery, heat and the full device matrix remain manual release gates.
