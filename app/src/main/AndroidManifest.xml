@@ -60,7 +60,13 @@
             android:name=".download.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
+            android:process=":engine"
             android:stopWithTask="false" />
+        <service
+            android:name=".extractor.ExtractorEngineService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:process=":engine" />
         <service
             android:name=".bubble.BubbleOverlayService"
             android:exported="false"
@@ -85,6 +91,7 @@
         <service
             android:name=".media.CompatibleCopyService"
             android:exported="false"
-            android:foregroundServiceType="mediaProcessing" />
+            android:foregroundServiceType="mediaProcessing"
+            android:process=":engine" />
     </application>
 </manifest>

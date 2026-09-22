@@ -73,6 +73,19 @@ Phase 8 — Compatible Copy and Player is complete:
 - Original media is SHA-256 checked before/after and never replaced; the compatible output is independently verified
 - Storage, estimated duration, battery and thermal preflight with conservative low-battery/hot-device blocking
 
+Phase 9 — Optimization and Hardening is complete:
+
+- Baseline/startup profiles and a minified Macrobenchmark target for cold/warm launch and navigation frame timing
+- UI and heavy engine process separation, multi-process Room/DataStore state, lazy extractor/FFmpeg/WebView startup
+- Low-RAM/thermal adaptive concurrency, serialized heavy work and optional low-battery download pause
+- Exact-format expired-link re-extraction, persisted bounded retry and restart/reboot recovery
+- User-triggered extractor staging, checksum validation, Keystore-authenticated metadata, known-good rollback
+- Stronger HTTP failure classification and signed URL/header/cookie redaction
+- Full media sampling verification plus real public non-DRM 4K video/audio track stream-copy test
+- R8/resource shrinking and arm64-v8a, armeabi-v7a, x86, x86_64 and universal APK outputs
+
+Measured API 37 AVD results are in [`docs/performance-report.md`](docs/performance-report.md). They are diagnostic only; no physical-phone battery, heat, low-RAM or performance claim is made.
+
 Earlier foundation work remains in place:
 
 Phase 1 — App Foundation:

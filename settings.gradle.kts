@@ -26,4 +26,5 @@ include(
     ":core:media",
     ":core:storage",
     ":core:browser",
+    ":benchmark",
 )

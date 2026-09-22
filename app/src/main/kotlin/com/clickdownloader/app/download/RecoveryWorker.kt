@@ -20,9 +20,14 @@ class RecoveryWorker(context: Context, params: WorkerParameters) : CoroutineWork
         if (retryJobId == null) {
             container.downloadJobRepository.recoverInterruptedJobs()
         } else {
+            val request = container.downloadRequestRepository.findByJobId(retryJobId)
+            val job = container.downloadJobRepository.findById(retryJobId)
+            if (request == null || job?.state != DownloadJobState.RETRY_SCHEDULED || request.attempt > request.maxAttempts) {
+                return Result.success()
+            }
             container.downloadJobRepository.updateState(retryJobId, DownloadJobState.QUEUED)
         }
-        DownloadService.start(applicationContext)
+        if (container.downloadRequestRepository.nextQueued() != null) DownloadService.start(applicationContext)
         return Result.success()
     }
 

@@ -19,15 +19,19 @@ import com.clickdownloader.core.storage.AndroidDownloadFinalizer
 import com.clickdownloader.core.download.DirectMediaProbe
 import com.clickdownloader.core.download.HttpDirectDownloader
 import com.clickdownloader.core.extractor.YtDlpExtractor
+import com.clickdownloader.core.extractor.ExactFormatRefresher
+import com.clickdownloader.core.extractor.ExtractorUpdateManager
 import com.clickdownloader.core.media.YtDlpAdaptiveMediaProcessor
 import com.clickdownloader.core.browser.SessionCookieExporter
 import com.clickdownloader.core.browser.SessionVault
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
+import com.clickdownloader.app.performance.HeavyWorkCoordinator
 
 class AppContainer(context: Context) {
     val appContext: Context = context.applicationContext
+    val heavyWorkCoordinator = HeavyWorkCoordinator()
 
     val downloadJobRepository: DownloadJobRepository by lazy {
         DataRepositories.createDownloadJobRepository(appContext)
@@ -50,6 +54,8 @@ class AppContainer(context: Context) {
     }
 
     val mediaExtractor: MediaExtractor by lazy { YtDlpExtractor(appContext) }
+    val exactFormatRefresher: ExactFormatRefresher by lazy { ExactFormatRefresher(mediaExtractor) }
+    val extractorUpdateManager: ExtractorUpdateManager by lazy { ExtractorUpdateManager(appContext) }
 
     val fragmentCheckpointRepository: FragmentCheckpointRepository by lazy {
         DataRepositories.createFragmentCheckpointRepository(appContext)
@@ -83,4 +89,6 @@ class AppContainer(context: Context) {
 
     fun exportBrowserSession(host: String): String? = SessionVault(appContext).restore(host)
         ?.let { SessionCookieExporter(appContext).export(host, it).absolutePath }
+
+    fun hasBrowserSession(host: String): Boolean = SessionVault(appContext).restore(host) != null
 }

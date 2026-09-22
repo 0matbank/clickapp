@@ -90,6 +90,7 @@ import com.clickdownloader.core.model.FormatCompatibility
 import com.clickdownloader.core.model.MediaFormatOption
 import com.clickdownloader.core.model.LibraryMedia
 import com.clickdownloader.core.extractor.BatchQualityRule
+import com.clickdownloader.core.extractor.ExtractorUpdateChannel
 
 private enum class Destination(
     val route: String,
@@ -257,6 +258,10 @@ fun ClickDownloaderApp(
                     onAccessibilityAssistChanged = viewModel::setAccessibilityBubbleAssist,
                     onAllowLowBatteryConversionChanged = viewModel::setAllowConversionOnLowBattery,
                     onAllowHotConversionChanged = viewModel::setAllowConversionWhenHot,
+                    onPauseDownloadsOnLowBatteryChanged = viewModel::setPauseDownloadsOnLowBattery,
+                    onReadExtractorVersion = viewModel::readExtractorVersion,
+                    onUpdateExtractor = viewModel::updateExtractor,
+                    onRollbackExtractor = viewModel::rollbackExtractor,
                 )
             }
         }
@@ -626,6 +631,10 @@ private fun SettingsScreen(
     onAccessibilityAssistChanged: (Boolean) -> Unit,
     onAllowLowBatteryConversionChanged: (Boolean) -> Unit,
     onAllowHotConversionChanged: (Boolean) -> Unit,
+    onPauseDownloadsOnLowBatteryChanged: (Boolean) -> Unit,
+    onReadExtractorVersion: () -> Unit,
+    onUpdateExtractor: (ExtractorUpdateChannel) -> Unit,
+    onRollbackExtractor: () -> Unit,
 ) {
     val context = LocalContext.current
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -760,6 +769,27 @@ private fun SettingsScreen(
                     Text(stringResource(R.string.allow_hot_conversion), modifier = Modifier.weight(1f))
                     Switch(checked = state.settings.allowConversionWhenHot, onCheckedChange = onAllowHotConversionChanged)
                 }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.pause_downloads_low_battery), modifier = Modifier.weight(1f))
+                    Switch(checked = state.settings.pauseDownloadsOnLowBattery, onCheckedChange = onPauseDownloadsOnLowBatteryChanged)
+                }
+            }
+        }
+        item { HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) }
+        item {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.settings_extractor), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.extractor_update_help), style = MaterialTheme.typography.bodySmall)
+                state.extractorStatus.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = !state.extractorStatus.running, onClick = onReadExtractorVersion) { Text(stringResource(R.string.extractor_version)) }
+                    Button(enabled = !state.extractorStatus.running, onClick = { onUpdateExtractor(ExtractorUpdateChannel.STABLE) }) { Text(stringResource(R.string.extractor_update_stable)) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = !state.extractorStatus.running, onClick = { onUpdateExtractor(ExtractorUpdateChannel.BETA) }) { Text(stringResource(R.string.extractor_update_beta)) }
+                    OutlinedButton(enabled = !state.extractorStatus.running, onClick = onRollbackExtractor) { Text(stringResource(R.string.extractor_rollback)) }
+                }
+                if (state.extractorStatus.running) CircularProgressIndicator()
             }
         }
     }

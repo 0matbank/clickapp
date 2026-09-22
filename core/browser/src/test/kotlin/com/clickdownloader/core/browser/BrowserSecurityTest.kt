@@ -22,4 +22,11 @@ class BrowserSecurityTest {
         assertFalse(redacted.contains("secret"))
         assertFalse(redacted.contains("hidden"))
     }
+
+    @Test fun `redactor removes common cloud signed URL credentials`() {
+        val redacted = SecretRedactor.redact("https://cdn.test/file?X-Amz-Signature=secret&Policy=private&Key-Pair-Id=id")
+        assertFalse(redacted.contains("secret"))
+        assertFalse(redacted.contains("private"))
+        assertFalse(redacted.endsWith("=id"))
+    }
 }

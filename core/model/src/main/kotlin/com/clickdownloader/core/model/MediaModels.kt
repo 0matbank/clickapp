@@ -12,7 +12,7 @@ data class MediaMetadata(
     val uploadDate: String? = null,
     val liveStatus: LiveStatus = LiveStatus.NOT_LIVE,
     val expiryHintEpochMillis: Long? = null,
-)
+) : java.io.Serializable
 
 enum class LiveStatus {
     NOT_LIVE,
@@ -70,7 +70,7 @@ data class MediaFormatOption(
     val drmProtected: Boolean = false,
     val compatibility: FormatCompatibility = FormatCompatibility.UNKNOWN,
     val httpHeaders: Map<String, String> = emptyMap(),
-) {
+) : java.io.Serializable {
     val isAudioOnly: Boolean get() = hasAudio && !hasVideo
     val isProgressive: Boolean get() = hasAudio && hasVideo && protocol == StreamProtocol.HTTP
 }
@@ -81,7 +81,7 @@ data class SubtitleTrack(
     val extension: String? = null,
     val url: String? = null,
     val isAutomatic: Boolean = false,
-)
+) : java.io.Serializable
 
 data class PlaylistItem(
     val id: String,
@@ -90,7 +90,7 @@ data class PlaylistItem(
     val position: Int,
     val durationMillis: Long? = null,
     val thumbnailUrl: String? = null,
-)
+) : java.io.Serializable
 
 data class MediaAnalysis(
     val metadata: MediaMetadata,
@@ -100,4 +100,4 @@ data class MediaAnalysis(
     val webpageUrl: String,
     val isPlaylist: Boolean = false,
     val playlistItems: List<PlaylistItem> = emptyList(),
-)
+) : java.io.Serializable

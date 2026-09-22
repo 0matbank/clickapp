@@ -18,12 +18,14 @@ class YtDlpMediaCommandTest {
             jobId = "job",
             preferredContainer = "mkv",
             cookieFilePath = "/private/session-cookie.txt",
+            fragmentConcurrency = 6,
         ).buildCommand()
 
         assertEquals("401+251", command[command.indexOf("--format") + 1])
         assertEquals("mkv", command[command.indexOf("--merge-output-format") + 1])
         assertTrue("--continue" in command)
         assertTrue("--keep-fragments" in command)
+        assertEquals("6", command[command.indexOf("--concurrent-fragments") + 1])
         assertTrue("--embed-metadata" in command)
         assertTrue("--embed-thumbnail" in command)
         assertTrue("--embed-subs" in command)

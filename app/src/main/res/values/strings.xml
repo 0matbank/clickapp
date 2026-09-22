@@ -149,4 +149,11 @@
     <string name="settings_conversion">Compatible-copy conversion</string>
     <string name="allow_low_battery_conversion">Allow while battery is below 15%</string>
     <string name="allow_hot_conversion">Allow while device reports severe heat</string>
+    <string name="settings_extractor">Extractor engine</string>
+    <string name="extractor_update_help">Updates run only when you tap. Stable and beta channels use the official HTTPS updater; a verified rollback copy is kept.</string>
+    <string name="extractor_version">Check version</string>
+    <string name="extractor_update_stable">Update stable</string>
+    <string name="extractor_update_beta">Update beta</string>
+    <string name="extractor_rollback">Rollback</string>
+    <string name="pause_downloads_low_battery">Pause new downloads below 15%% battery</string>
 </resources>

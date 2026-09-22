@@ -25,4 +25,5 @@ data class AppSettings(
     val accessibilityBubbleAssist: Boolean = false,
     val allowConversionOnLowBattery: Boolean = false,
     val allowConversionWhenHot: Boolean = false,
+    val pauseDownloadsOnLowBattery: Boolean = false,
 )

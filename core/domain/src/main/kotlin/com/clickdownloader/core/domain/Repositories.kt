@@ -91,6 +91,7 @@ interface SettingsRepository {
     suspend fun setAccessibilityBubbleAssist(enabled: Boolean)
     suspend fun setAllowConversionOnLowBattery(enabled: Boolean)
     suspend fun setAllowConversionWhenHot(enabled: Boolean)
+    suspend fun setPauseDownloadsOnLowBattery(enabled: Boolean)
 }
 
 interface StorageGateway {

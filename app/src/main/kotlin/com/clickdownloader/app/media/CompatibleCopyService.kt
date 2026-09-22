@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.clickdownloader.app.ClickDownloaderApplication
 import com.clickdownloader.app.R
 import com.clickdownloader.core.media.CompatibleCopyProcessor
+import com.clickdownloader.core.media.DevicePerformancePolicy
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +43,12 @@ class CompatibleCopyService : Service() {
             val container = (application as ClickDownloaderApplication).container
             val settings = container.settingsRepository.settings.first()
             val work = File(cacheDir, "compatible/$jobId-${System.currentTimeMillis()}")
+            var conversionStarted = false
             try {
+                conversionStarted = container.heavyWorkCoordinator.tryStartConversion(DevicePerformancePolicy.detect(this@CompatibleCopyService).lowRam)
+                check(conversionStarted) {
+                    "Conversion is deferred while a download is active on this low-memory device"
+                }
                 val result = CompatibleCopyProcessor(this@CompatibleCopyService).convert(
                     uri,
                     work,
@@ -56,6 +62,7 @@ class CompatibleCopyService : Service() {
             } catch (error: Throwable) {
                 foreground(getString(R.string.conversion_failed, error.message ?: getString(R.string.unknown_error)), ongoing = false)
             } finally {
+                if (conversionStarted) container.heavyWorkCoordinator.conversionFinished()
                 work.deleteRecursively()
                 stopForeground(STOP_FOREGROUND_DETACH)
                 stopSelf()

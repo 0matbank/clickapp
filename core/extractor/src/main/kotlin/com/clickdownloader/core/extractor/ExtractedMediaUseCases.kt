@@ -36,7 +36,7 @@ data class BatchPreparation(
     val allSizesKnown: Boolean = items.all { it.primary.estimatedBytes != null && (it.audio == null || it.audio.estimatedBytes != null) }
 }
 
-data class PendingMediaSelection(val jobId: String, val analysis: MediaAnalysis, val sessionHost: String? = null)
+data class PendingMediaSelection(val jobId: String, val analysis: MediaAnalysis, val sessionHost: String? = null) : java.io.Serializable
 
 class AnalyzeExtractedMediaUseCase(
     private val jobs: DownloadJobRepository,
@@ -70,8 +70,9 @@ class AnalyzeExtractedMediaUseCase(
 }
 
 class PreparePlaylistBatchUseCase(
-    private val analyze: AnalyzeExtractedMediaUseCase,
+    private val analyze: suspend (String, String?, String?) -> PendingMediaSelection,
 ) {
+    constructor(analyze: AnalyzeExtractedMediaUseCase) : this({ url, cookie, host -> analyze(url, cookie, host) })
     suspend operator fun invoke(
         playlistId: String,
         items: List<com.clickdownloader.core.model.PlaylistItem>,

@@ -29,7 +29,8 @@ class YtDlpAdaptiveMediaProcessor(context: Context) : AdaptiveMediaProcessor {
     ): ProcessedMediaArtifact = withContext(Dispatchers.IO) {
         ensureInitialized()
         workingDirectory.mkdirs()
-        val request = YtDlpMediaCommand.build(sourceUrl, exactFormatSpec, workingDirectory, jobId, preferredContainer, cookieFilePath)
+        val policy = DevicePerformancePolicy.detect(appContext)
+        val request = YtDlpMediaCommand.build(sourceUrl, exactFormatSpec, workingDirectory, jobId, preferredContainer, cookieFilePath, policy.fragmentConcurrency)
         try {
             YoutubeDL.getInstance().execute(request, jobId) { percent, eta, line ->
                 runBlocking {
@@ -102,6 +103,7 @@ object YtDlpMediaCommand {
         jobId: String,
         preferredContainer: String?,
         cookieFilePath: String? = null,
+        fragmentConcurrency: Int = 4,
     ): YoutubeDLRequest = YoutubeDLRequest(sourceUrl).apply {
         addOption("--no-playlist")
         addOption("--format", exactFormatSpec)
@@ -109,6 +111,7 @@ object YtDlpMediaCommand {
         addOption("--continue")
         addOption("--part")
         addOption("--keep-fragments")
+        addOption("--concurrent-fragments", fragmentConcurrency.coerceIn(1, 8).toString())
         addOption("--hls-use-mpegts")
         addOption("--newline")
         addOption("--embed-metadata")

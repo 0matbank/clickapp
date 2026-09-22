@@ -11,22 +11,30 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.core.MultiProcessDataStoreFactory
+import androidx.datastore.core.Serializer
+import androidx.datastore.preferences.core.PreferencesSerializer
 import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.model.AppLanguage
 import com.clickdownloader.core.model.AppSettings
 import com.clickdownloader.core.model.AppThemeMode
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import okio.buffer
+import okio.sink
+import okio.source
 
 class DataStoreSettingsRepository(
     context: Context,
 ) : SettingsRepository {
-    private val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create {
-        context.applicationContext.preferencesDataStoreFile(FILE_NAME)
-    }
+    private val dataStore: DataStore<Preferences> = MultiProcessDataStoreFactory.create(
+        serializer = StreamPreferencesSerializer,
+        produceFile = { context.applicationContext.preferencesDataStoreFile(FILE_NAME) },
+    )
 
     override val settings: Flow<AppSettings> = dataStore.data
         .catch { error ->
@@ -49,6 +57,7 @@ class DataStoreSettingsRepository(
                 accessibilityBubbleAssist = preferences[Keys.BUBBLE_ACCESSIBILITY] ?: false,
                 allowConversionOnLowBattery = preferences[Keys.CONVERT_LOW_BATTERY] ?: false,
                 allowConversionWhenHot = preferences[Keys.CONVERT_WHEN_HOT] ?: false,
+                pauseDownloadsOnLowBattery = preferences[Keys.PAUSE_DOWNLOADS_LOW_BATTERY] ?: false,
             )
         }
 
@@ -99,6 +108,10 @@ class DataStoreSettingsRepository(
         dataStore.edit { it[Keys.CONVERT_WHEN_HOT] = enabled }
     }
 
+    override suspend fun setPauseDownloadsOnLowBattery(enabled: Boolean) {
+        dataStore.edit { it[Keys.PAUSE_DOWNLOADS_LOW_BATTERY] = enabled }
+    }
+
     private object Keys {
         val LANGUAGE = stringPreferencesKey("language")
         val THEME = stringPreferencesKey("theme")
@@ -111,10 +124,24 @@ class DataStoreSettingsRepository(
         val BUBBLE_ACCESSIBILITY = booleanPreferencesKey("bubble_accessibility_assist")
         val CONVERT_LOW_BATTERY = booleanPreferencesKey("allow_conversion_low_battery")
         val CONVERT_WHEN_HOT = booleanPreferencesKey("allow_conversion_when_hot")
+        val PAUSE_DOWNLOADS_LOW_BATTERY = booleanPreferencesKey("pause_downloads_low_battery")
     }
 
     private companion object {
         const val FILE_NAME = "click_downloader_settings.preferences_pb"
         val PACKAGE_PATTERN = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
+    }
+}
+
+private object StreamPreferencesSerializer : Serializer<Preferences> {
+    override val defaultValue: Preferences = PreferencesSerializer.defaultValue
+
+    override suspend fun readFrom(input: InputStream): Preferences =
+        PreferencesSerializer.readFrom(input.source().buffer())
+
+    override suspend fun writeTo(t: Preferences, output: OutputStream) {
+        val buffered = output.sink().buffer()
+        PreferencesSerializer.writeTo(t, buffered)
+        buffered.flush()
     }
 }

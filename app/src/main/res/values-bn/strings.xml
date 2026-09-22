@@ -149,4 +149,11 @@
     <string name="settings_conversion">Compatible-copy conversion</string>
     <string name="allow_low_battery_conversion">Battery ১৫%-এর নিচে হলেও conversion চালান</string>
     <string name="allow_hot_conversion">Device severe heat জানালেও conversion চালান</string>
+    <string name="settings_extractor">Extractor engine</string>
+    <string name="extractor_update_help">শুধু আপনার tap-এ update চলবে। Stable ও beta channel official HTTPS updater ব্যবহার করে এবং verified rollback copy রাখে।</string>
+    <string name="extractor_version">Version দেখুন</string>
+    <string name="extractor_update_stable">Stable update</string>
+    <string name="extractor_update_beta">Beta update</string>
+    <string name="extractor_rollback">Rollback</string>
+    <string name="pause_downloads_low_battery">Battery ১৫%-এর নিচে হলে নতুন download pause করুন</string>
 </resources>

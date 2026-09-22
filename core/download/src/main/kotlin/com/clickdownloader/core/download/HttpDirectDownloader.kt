@@ -45,6 +45,10 @@ class HttpDirectDownloader(private val client: OkHttpClient) {
                     403, 410 -> throw DirectDownloadException(DirectDownloadFailure.LINK_EXPIRED, "The media link expired")
                     429 -> throw DirectDownloadException(DirectDownloadFailure.RATE_LIMITED, "The server rate-limited the request")
                 }
+                if (response.code in 500..599) throw DirectDownloadException(
+                    DirectDownloadFailure.NETWORK,
+                    "The media server is temporarily unavailable (HTTP ${response.code})",
+                )
                 if (!response.isSuccessful) throw DirectDownloadException(
                     DirectDownloadFailure.INVALID_RESPONSE,
                     "Unexpected HTTP ${response.code}",

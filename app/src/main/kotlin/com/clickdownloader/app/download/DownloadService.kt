@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.BatteryManager
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.clickdownloader.app.ClickDownloaderApplication
@@ -19,6 +20,9 @@ import com.clickdownloader.core.model.DownloadKind
 import com.clickdownloader.core.model.DownloadProgress
 import com.clickdownloader.core.model.PartialFilePolicy
 import com.clickdownloader.core.media.MediaArtifactVerifier
+import com.clickdownloader.core.media.DevicePerformancePolicy
+import com.clickdownloader.core.browser.SecretRedactor
+import com.clickdownloader.core.extractor.ExactFormatUnavailableException
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -28,6 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 class DownloadService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -90,6 +95,15 @@ class DownloadService : Service() {
         control.set(DownloadControl.Continue)
         jobs.updateState(job.id, DownloadJobState.PREPARING)
         foreground(job.id, job.displayTitle, DownloadJobState.PREPARING)
+        val batteryManager = getSystemService(BatteryManager::class.java)
+        val batteryPercent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        if (container.settingsRepository.settings.first().pauseDownloadsOnLowBattery &&
+            batteryPercent in 0..14 && !batteryManager.isCharging
+        ) {
+            jobs.updateState(job.id, DownloadJobState.RETRY_SCHEDULED, "LOW_BATTERY", "Waiting for battery level or charging")
+            RecoveryWorker.schedule(this, 15 * 60_000L, job.id)
+            return
+        }
         val partial = request.temporaryPath?.let(::File)
             ?: File(filesDir, "partial/${job.id}.part").also {
                 container.downloadRequestRepository.upsert(request.copy(temporaryPath = it.absolutePath))
@@ -103,8 +117,17 @@ class DownloadService : Service() {
         val downloadState = if (request.mimeType?.startsWith("audio/") == true) DownloadJobState.DOWNLOADING_AUDIO else DownloadJobState.DOWNLOADING_VIDEO
         jobs.updateState(job.id, downloadState)
         var sessionCookieFile: File? = null
+        val workStarted = container.heavyWorkCoordinator.tryStartDownload(DevicePerformancePolicy.detect(this).lowRam)
+        if (!workStarted) {
+            jobs.updateState(job.id, DownloadJobState.RETRY_SCHEDULED, "LOW_RAM_BUSY", "Waiting for the active conversion to finish")
+            RecoveryWorker.schedule(this, 15_000, job.id)
+            return
+        }
         try {
             sessionCookieFile = request.sessionHost?.let(container::exportBrowserSession)?.let(::File)
+            if (request.sessionHost != null && sessionCookieFile == null) {
+                throw DirectDownloadException(DirectDownloadFailure.AUTH_REQUIRED, "The saved login session is unavailable or expired")
+            }
             val artifactFile: File
             val verifiedSize: Long
             val sidecars: List<String>
@@ -185,6 +208,7 @@ class DownloadService : Service() {
                 DownloadControl.Continue -> handleFailure(request, classifyProcessingFailure(error))
             }
         } finally {
+            container.heavyWorkCoordinator.downloadFinished()
             sessionCookieFile?.delete()
             activeJobId.compareAndSet(job.id, null)
             activeIsLive.set(false)
@@ -192,6 +216,9 @@ class DownloadService : Service() {
     }
 
     private suspend fun handleFailure(request: com.clickdownloader.core.model.DownloadRequest, error: DirectDownloadException) {
+        if (error.failure == DirectDownloadFailure.LINK_EXPIRED && request.kind != DownloadKind.DIRECT) {
+            if (refreshExpiredExactFormat(request)) return
+        }
         val terminalState = when (error.failure) {
             DirectDownloadFailure.AUTH_REQUIRED -> DownloadJobState.AUTH_REQUIRED
             DirectDownloadFailure.LINK_EXPIRED -> DownloadJobState.LINK_EXPIRED
@@ -201,25 +228,60 @@ class DownloadService : Service() {
             else -> DownloadJobState.FAILED
         }
         val retryable = terminalState == DownloadJobState.RETRY_SCHEDULED && request.attempt < request.maxAttempts
-        container.downloadJobRepository.updateState(request.jobId, if (retryable) DownloadJobState.RETRY_SCHEDULED else terminalState, error.failure.name, error.message)
+        val safeMessage = SecretRedactor.redact(error.message ?: "Download failed")
+        container.downloadJobRepository.updateState(request.jobId, if (retryable) DownloadJobState.RETRY_SCHEDULED else terminalState, error.failure.name, safeMessage)
         if (retryable) {
             val next = request.copy(attempt = request.attempt + 1)
             container.downloadRequestRepository.upsert(next)
+            container.downloadJobRepository.findById(request.jobId)?.let { job ->
+                container.downloadJobRepository.upsert(job.copy(state = DownloadJobState.RETRY_SCHEDULED, retryCount = next.attempt, errorCode = error.failure.name, errorMessage = safeMessage))
+            }
             RecoveryWorker.schedule(this, retryPolicy.delayMillis(next.attempt), request.jobId)
         }
     }
 
-    private fun classifyProcessingFailure(error: Throwable): DirectDownloadException {
-        val message = error.message ?: "Media processing failed"
-        val lower = message.lowercase()
-        val failure = when {
-            "401" in lower || "login" in lower || "authentication" in lower -> DirectDownloadFailure.AUTH_REQUIRED
-            "403" in lower || "410" in lower || "expired" in lower -> DirectDownloadFailure.LINK_EXPIRED
-            "429" in lower || "rate limit" in lower -> DirectDownloadFailure.RATE_LIMITED
-            "network" in lower || "timed out" in lower || "connection" in lower || "unable to download" in lower -> DirectDownloadFailure.NETWORK
-            else -> DirectDownloadFailure.VERIFICATION
+    private suspend fun refreshExpiredExactFormat(request: com.clickdownloader.core.model.DownloadRequest): Boolean {
+        if (request.attempt >= request.maxAttempts) return false
+        val job = container.downloadJobRepository.findById(request.jobId) ?: return false
+        val selected = container.extractionRepository.findSelectedFormat(request.jobId) ?: return false
+        var cookieFile: File? = null
+        return try {
+            container.downloadJobRepository.updateState(request.jobId, DownloadJobState.LINK_EXPIRED, "LINK_EXPIRED", "The media link expired; refreshing the exact selected format")
+            cookieFile = request.sessionHost?.let(container::exportBrowserSession)?.let(::File)
+            if (request.sessionHost != null && cookieFile == null) {
+                container.downloadJobRepository.updateState(request.jobId, DownloadJobState.AUTH_REQUIRED, "AUTH_REQUIRED", "The saved login session expired; sign in again")
+                true
+            } else {
+                container.downloadJobRepository.updateState(request.jobId, DownloadJobState.ANALYZING)
+                container.exactFormatRefresher.refresh(job.sourceUrl, selected.formatId, cookieFile?.absolutePath)
+                val next = request.copy(attempt = request.attempt + 1)
+                container.downloadRequestRepository.upsert(next)
+                container.downloadJobRepository.upsert(job.copy(
+                    state = DownloadJobState.RETRY_SCHEDULED,
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                    retryCount = next.attempt,
+                    errorCode = "LINK_REFRESHED",
+                    errorMessage = "The exact selected format was refreshed",
+                ))
+                RecoveryWorker.schedule(this, retryPolicy.delayMillis(next.attempt), request.jobId)
+                true
+            }
+        } catch (error: ExactFormatUnavailableException) {
+            container.downloadJobRepository.updateState(request.jobId, DownloadJobState.LINK_EXPIRED, "EXACT_FORMAT_UNAVAILABLE", SecretRedactor.redact(error.message.orEmpty()))
+            true
+        } catch (error: Throwable) {
+            val classified = classifyProcessingFailure(error)
+            if (classified.failure == DirectDownloadFailure.AUTH_REQUIRED) {
+                container.downloadJobRepository.updateState(request.jobId, DownloadJobState.AUTH_REQUIRED, "AUTH_REQUIRED", "Sign in again to refresh this source")
+                true
+            } else false
+        } finally {
+            cookieFile?.delete()
         }
-        return DirectDownloadException(failure, message, error)
+    }
+
+    private fun classifyProcessingFailure(error: Throwable): DirectDownloadException {
+        return DownloadFailureClassifier.classify(error)
     }
 
     private fun foreground(jobId: String, title: String, state: DownloadJobState, progress: DownloadProgress? = null) {
@@ -232,6 +294,18 @@ class DownloadService : Service() {
     }
 
     private fun resume(jobId: String) = scope.launch {
+        val job = container.downloadJobRepository.findById(jobId) ?: return@launch
+        val request = container.downloadRequestRepository.findByJobId(jobId) ?: return@launch
+        if (job.state.isTerminal) return@launch
+        if (request.attempt >= request.maxAttempts && job.state != DownloadJobState.PAUSED) {
+            container.downloadJobRepository.updateState(jobId, DownloadJobState.FAILED, "RETRY_LIMIT", "Retry limit reached; analyze the source again")
+            return@launch
+        }
+        val requiredSessionHost = request.sessionHost
+        if (requiredSessionHost != null && !container.hasBrowserSession(requiredSessionHost)) {
+            container.downloadJobRepository.updateState(jobId, DownloadJobState.AUTH_REQUIRED, "AUTH_REQUIRED", "The saved login session expired; sign in again")
+            return@launch
+        }
         container.downloadJobRepository.updateState(jobId, DownloadJobState.QUEUED)
         processQueue()
     }

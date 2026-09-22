@@ -1,6 +1,8 @@
 package com.clickdownloader.core.download
 
 import com.clickdownloader.core.model.DownloadRequest
+import com.clickdownloader.core.model.DirectDownloadException
+import com.clickdownloader.core.model.DirectDownloadFailure
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.test.runTest
@@ -105,5 +107,23 @@ class HttpDirectDownloaderTest {
         assertArrayEquals(media, partial.readBytes())
         server.takeRequest()
         assertEquals("bytes=$retainedBytes-", server.takeRequest().headers["Range"])
+    }
+
+    @Test fun `expired rate limited and server failures have recoverable classifications`() = runTest {
+        val cases = listOf(
+            403 to DirectDownloadFailure.LINK_EXPIRED,
+            410 to DirectDownloadFailure.LINK_EXPIRED,
+            429 to DirectDownloadFailure.RATE_LIMITED,
+            503 to DirectDownloadFailure.NETWORK,
+        )
+        cases.forEachIndexed { index, (status, expected) ->
+            server.enqueue(MockResponse().setResponseCode(status))
+            val request = DownloadRequest("job-$index", server.url("/media-$index.mp4").toString(), "media.mp4", "video/mp4")
+            val failure = try {
+                HttpDirectDownloader(OkHttpClient()).download(request, File(directory, "$index.part"))
+                throw AssertionError("Expected HTTP $status to fail")
+            } catch (error: DirectDownloadException) { error }
+            assertEquals(expected, failure.failure)
+        }
     }
 }

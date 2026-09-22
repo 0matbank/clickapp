@@ -22,5 +22,6 @@ dependencies {
     implementation(libs.youtubedl.android)
     implementation(libs.jackson.databind)
     testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }

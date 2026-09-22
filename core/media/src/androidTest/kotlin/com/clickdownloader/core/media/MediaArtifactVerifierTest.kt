@@ -17,6 +17,36 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MediaArtifactVerifierTest {
     @Test
+    fun downloadsAndLosslesslyMergesPublic4kSourceTracks() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        FFmpeg.getInstance().init(context)
+        val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        val directory = File(context.cacheDir, "public-4k-${System.nanoTime()}").apply { mkdirs() }
+        val merged = File(directory, "public-4k-merged.mp4")
+
+        // Public, non-DRM DASH source tracks maintained for Shaka Player interoperability tests.
+        execute(
+            context,
+            ffmpeg,
+            "-t", "1",
+            "-i", "https://storage.googleapis.com/shaka-demo-assets/sintel-mp4-only/v-2160p-17000k-libx264.mp4",
+            "-t", "1",
+            "-i", "https://storage.googleapis.com/shaka-demo-assets/sintel-mp4-only/a-eng-0128k-aac.mp4",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c", "copy",
+            "-shortest",
+            merged.absolutePath,
+        )
+
+        val inspection = MediaArtifactVerifier.verify(merged, selected("public-4k+audio", 3840, 1636))
+        assertEquals(3840, inspection.width)
+        assertEquals(1636, inspection.height)
+        assertTrue(inspection.hasVideo && inspection.hasAudio)
+        directory.deleteRecursively()
+    }
+
+    @Test
     fun compatibleCopyPreservesOriginalAndResolution() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         FFmpeg.getInstance().init(context)

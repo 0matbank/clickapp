@@ -18,7 +18,7 @@ object DataRepositories {
             context.applicationContext,
             ClickDownloaderDatabase::class.java,
             "click_downloader.db",
-        ).build().also { instance = it }
+        ).enableMultiInstanceInvalidation().build().also { instance = it }
     }
 
     fun createDownloadJobRepository(context: Context): DownloadJobRepository {

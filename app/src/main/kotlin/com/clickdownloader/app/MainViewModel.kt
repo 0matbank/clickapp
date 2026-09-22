@@ -9,12 +9,13 @@ import com.clickdownloader.core.domain.SettingsRepository
 import com.clickdownloader.core.domain.StorageGateway
 import com.clickdownloader.core.domain.OutputFileRepository
 import com.clickdownloader.core.download.CreateDirectDownloadUseCase
-import com.clickdownloader.core.extractor.AnalyzeExtractedMediaUseCase
 import com.clickdownloader.core.extractor.PendingMediaSelection
 import com.clickdownloader.core.extractor.QueueExactFormatUseCase
 import com.clickdownloader.core.extractor.BatchPreparation
 import com.clickdownloader.core.extractor.BatchQualityRule
 import com.clickdownloader.core.extractor.ConfirmPlaylistBatchUseCase
+import com.clickdownloader.core.extractor.ExtractorUpdateChannel
+import com.clickdownloader.app.extractor.IsolatedAnalysisClient
 import com.clickdownloader.core.extractor.PreparePlaylistBatchUseCase
 import com.clickdownloader.core.model.AppLanguage
 import com.clickdownloader.core.model.AppSettings
@@ -46,7 +47,10 @@ data class MainUiState(
     val liveJobIds: Set<String> = emptySet(),
     val library: List<LibraryMedia> = emptyList(),
     val compatibleCopyPrompt: CompatibleCopyPrompt? = null,
+    val extractorStatus: ExtractorStatus = ExtractorStatus(),
 )
+
+data class ExtractorStatus(val running: Boolean = false, val version: String? = null, val message: String? = null)
 
 data class CompatibleCopyPrompt(val media: LibraryMedia, val preflight: ConversionPreflight)
 
@@ -68,26 +72,28 @@ class MainViewModel(
     private val settings: SettingsRepository,
     private val storage: StorageGateway,
     private val createDirectDownload: CreateDirectDownloadUseCase,
-    private val analyzeExtracted: AnalyzeExtractedMediaUseCase,
+    private val analyzeExtracted: suspend (String, String?, String?) -> PendingMediaSelection,
     private val queueExactFormat: QueueExactFormatUseCase,
     private val preparePlaylistBatch: PreparePlaylistBatchUseCase,
     private val confirmPlaylistBatch: ConfirmPlaylistBatchUseCase,
     private val exportSessionCookie: (String) -> String?,
     private val compatibleCopyProcessor: CompatibleCopyProcessor,
+    private val extractorClient: IsolatedAnalysisClient,
 ) : ViewModel() {
     private val inputUrl = MutableStateFlow("")
     private val message = MutableStateFlow<UiMessage?>(null)
     private val selection = MutableStateFlow(SelectionState())
     private val compatibleCopyPrompt = MutableStateFlow<CompatibleCopyPrompt?>(null)
+    private val extractorStatus = MutableStateFlow(ExtractorStatus())
 
     private val jobLibrary = combine(jobs.observeJobs(), downloadRequests.observeRequests(), outputFiles.observeFiles()) { jobList, requests, library ->
         Triple(jobList, requests.filter { it.kind == DownloadKind.LIVE }.mapTo(mutableSetOf()) { it.jobId }, library)
     }
-    private val backgroundUi = combine(jobLibrary, compatibleCopyPrompt) { data, prompt -> data to prompt }
+    private val backgroundUi = combine(jobLibrary, compatibleCopyPrompt, extractorStatus) { data, prompt, engine -> Triple(data, prompt, engine) }
 
     val uiState = combine(inputUrl, backgroundUi, settings.settings, message, selection) {
             url, background, appSettings, currentMessage, selectionState ->
-        val (jobInfo, copyPrompt) = background
+        val (jobInfo, copyPrompt, engine) = background
         MainUiState(
             inputUrl = url,
             jobs = jobInfo.first,
@@ -102,6 +108,7 @@ class MainViewModel(
             liveJobIds = jobInfo.second,
             library = jobInfo.third,
             compatibleCopyPrompt = copyPrompt,
+            extractorStatus = engine,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
@@ -216,6 +223,7 @@ class MainViewModel(
     fun setAccessibilityBubbleAssist(value: Boolean) { viewModelScope.launch { settings.setAccessibilityBubbleAssist(value) } }
     fun setAllowConversionOnLowBattery(value: Boolean) { viewModelScope.launch { settings.setAllowConversionOnLowBattery(value) } }
     fun setAllowConversionWhenHot(value: Boolean) { viewModelScope.launch { settings.setAllowConversionWhenHot(value) } }
+    fun setPauseDownloadsOnLowBattery(value: Boolean) { viewModelScope.launch { settings.setPauseDownloadsOnLowBattery(value) } }
     fun showBubbleFallback() { message.value = UiMessage.BUBBLE_SHARE_FALLBACK }
 
     fun prepareCompatibleCopy(media: LibraryMedia) {
@@ -241,17 +249,36 @@ class MainViewModel(
 
     fun consumeMessage() { message.value = null }
 
+    fun readExtractorVersion() = extractorOperation {
+        val version = extractorClient.currentVersion()
+        ExtractorStatus(version = version, message = "Current engine: $version")
+    }
+
+    fun updateExtractor(channel: ExtractorUpdateChannel) = extractorOperation {
+        val result = extractorClient.update(channel)
+        ExtractorStatus(version = result.version, message = if (result.changed) "Extractor updated and rollback copy saved" else "Extractor is already up to date")
+    }
+
+    fun rollbackExtractor() = extractorOperation {
+        val result = extractorClient.rollback()
+        ExtractorStatus(version = result.version, message = "Rolled back to verified engine ${result.version}")
+    }
+
+    private fun extractorOperation(block: suspend () -> ExtractorStatus) {
+        if (extractorStatus.value.running) return
+        viewModelScope.launch {
+            extractorStatus.value = extractorStatus.value.copy(running = true, message = null)
+            extractorStatus.value = runCatching { block() }
+                .getOrElse { ExtractorStatus(message = it.message ?: "Extractor operation failed") }
+        }
+    }
+
     companion object {
         fun factory(container: AppContainer): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val analyze = AnalyzeExtractedMediaUseCase(
-                    container.downloadJobRepository,
-                    container.extractionRepository,
-                    container.mediaExtractor,
-                    BuildConfig.VERSION_NAME,
-                    container.playlistRepository,
-                )
+                val analysisClient = IsolatedAnalysisClient(container.appContext)
+                val analyze: suspend (String, String?, String?) -> PendingMediaSelection = analysisClient::analyze
                 val queue = QueueExactFormatUseCase(container.downloadJobRepository, container.downloadRequestRepository, container.extractionRepository)
                 return MainViewModel(
                     container.downloadJobRepository,
@@ -266,6 +293,7 @@ class MainViewModel(
                     ConfirmPlaylistBatchUseCase(queue, container.playlistRepository, container.downloadJobRepository),
                     container::exportBrowserSession,
                     CompatibleCopyProcessor(container.appContext),
+                    analysisClient,
                 ) as T
             }
         }

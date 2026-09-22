@@ -6,7 +6,7 @@ import java.net.URI
 
 object SecretRedactor {
     private val header = Regex("(?i)(authorization|cookie|set-cookie)\\s*[:=]\\s*[^\\r\\n]+")
-    private val query = Regex("(?i)([?&](?:token|access_token|auth|signature|sig|key|session|code)=)[^&#\\s]+")
+    private val query = Regex("(?i)([?&](?:token|access_token|auth|authorization|signature|sig|key|session|code|policy|key-pair-id|x-amz-[^=&#\\s]+|x-goog-[^=&#\\s]+)=)[^&#\\s]+")
 
     fun redact(value: String): String = value
         .replace(header) { "${it.groupValues[1]}: <redacted>" }
