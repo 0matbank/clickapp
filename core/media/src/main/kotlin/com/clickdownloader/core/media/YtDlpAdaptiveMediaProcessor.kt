@@ -1,7 +1,6 @@
 package com.clickdownloader.core.media
 
 import android.content.Context
-import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.clickdownloader.core.domain.AdaptiveMediaProcessor
@@ -66,7 +65,7 @@ class YtDlpAdaptiveMediaProcessor(context: Context) : AdaptiveMediaProcessor {
     private fun ensureInitialized() {
         if (!initialized) {
             YoutubeDL.getInstance().init(appContext)
-            FFmpeg.getInstance().init(appContext)
+            FfmpegRuntime.initialize(appContext)
             initialized = true
         }
     }
@@ -128,6 +127,7 @@ object YtDlpMediaCommand {
 
 class LiveStreamFinalizer(private val context: Context) {
     fun finalize(jobId: String, directory: File, preferredContainer: String?): ProcessedMediaArtifact {
+        FfmpegRuntime.initialize(context)
         val extension = preferredContainer?.takeIf { it in setOf("mp4", "mkv", "webm") } ?: "mkv"
         val output = File(directory, "$jobId-live.$extension")
         val input = directory.listFiles().orEmpty()
@@ -138,10 +138,7 @@ class LiveStreamFinalizer(private val context: Context) {
         val process = ProcessBuilder(ffmpeg.absolutePath, "-y", "-hide_banner", "-loglevel", "error", "-i", input.absolutePath, "-map", "0", "-c", "copy", output.absolutePath)
             .redirectErrorStream(true)
             .apply {
-                environment()["LD_LIBRARY_PATH"] = listOf(
-                    context.applicationInfo.nativeLibraryDir,
-                    File(context.noBackupFilesDir, "youtubedl-android/packages/ffmpeg/usr/lib").absolutePath,
-                ).joinToString(":")
+                environment()["LD_LIBRARY_PATH"] = FfmpegRuntime.libraryPath(context)
             }
             .start()
         val outputText = process.inputStream.bufferedReader().readText()

@@ -64,6 +64,7 @@ class CompatibleCopyProcessor(context: Context) {
         allowWhenHot: Boolean,
         onProgress: (String) -> Unit = {},
     ): CompatibleCopyResult = withContext(Dispatchers.IO) {
+        FfmpegRuntime.initialize(appContext)
         val preflight = preflight(uri)
         require(preflight.availableBytes >= preflight.requiredFreeBytes) { "Not enough temporary storage for a compatible copy" }
         require(allowLowBattery || preflight.batteryPercent == null || preflight.batteryPercent >= 15) { "Battery is below 15%; connect a charger or allow low-battery conversion" }
@@ -83,10 +84,7 @@ class CompatibleCopyProcessor(context: Context) {
             output.absolutePath,
         )
         val process = ProcessBuilder(command).redirectErrorStream(true).apply {
-            environment()["LD_LIBRARY_PATH"] = listOf(
-                appContext.applicationInfo.nativeLibraryDir,
-                File(appContext.noBackupFilesDir, "youtubedl-android/packages/ffmpeg/usr/lib").absolutePath,
-            ).joinToString(":")
+            environment()["LD_LIBRARY_PATH"] = FfmpegRuntime.libraryPath(appContext)
         }.start()
         val log = process.inputStream.bufferedReader().use { it.readText().takeLast(8_000) }
         check(process.waitFor() == 0 && output.length() > 0) { "Compatible conversion failed: $log" }

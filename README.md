@@ -115,6 +115,7 @@ Browser/session handling is available through the optional Browser buttons on Ho
 - JDK 17
 - Android SDK Platform 37.0
 - Android SDK Build Tools 37.0.0
+- Android NDK 29.0.14206865 (used only to package the ABI-matched C++ runtime required by FFmpeg)
 - Android Platform Tools
 
 Set `ANDROID_HOME`/`ANDROID_SDK_ROOT`, or create an untracked `local.properties` containing `sdk.dir=...`.

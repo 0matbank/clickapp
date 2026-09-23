@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.tasks.Sync
 
 plugins {
     alias(libs.plugins.android.application)
@@ -14,9 +15,40 @@ val releaseSigningProperties = providers.gradleProperty("clickDownloaderKeystore
         Properties().apply { propertiesFile.inputStream().use(::load) }
     }
 
+val clickDownloaderNdkVersion = "29.0.14206865"
+val ndkHostTag = when {
+    System.getProperty("os.name").startsWith("Windows", ignoreCase = true) -> "windows-x86_64"
+    System.getProperty("os.name").startsWith("Mac", ignoreCase = true) -> "darwin-x86_64"
+    else -> "linux-x86_64"
+}
+val sdkDirectory = providers.environmentVariable("ANDROID_SDK_ROOT")
+    .orElse(providers.environmentVariable("ANDROID_HOME"))
+    .orElse(providers.provider {
+        Properties().apply {
+            rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use(::load)
+        }.getProperty("sdk.dir") ?: error("Set ANDROID_SDK_ROOT or sdk.dir in local.properties")
+    })
+val generatedCxxRuntime = layout.buildDirectory.dir("generated/cxx-runtime")
+val syncCxxRuntime by tasks.registering(Sync::class) {
+    val llvmLib = sdkDirectory.map {
+        file("$it/ndk/$clickDownloaderNdkVersion/toolchains/llvm/prebuilt/$ndkHostTag/sysroot/usr/lib")
+    }
+    into(generatedCxxRuntime)
+    from(llvmLib.map { it.resolve("aarch64-linux-android/libc++_shared.so") }) { into("arm64-v8a") }
+    from(llvmLib.map { it.resolve("arm-linux-androideabi/libc++_shared.so") }) { into("armeabi-v7a") }
+    from(llvmLib.map { it.resolve("i686-linux-android/libc++_shared.so") }) { into("x86") }
+    from(llvmLib.map { it.resolve("x86_64-linux-android/libc++_shared.so") }) { into("x86_64") }
+    doFirst {
+        require(llvmLib.get().isDirectory) {
+            "Android NDK $clickDownloaderNdkVersion is required; install it with sdkmanager."
+        }
+    }
+}
+
 android {
     namespace = "com.clickdownloader.app"
     compileSdk = 37
+    ndkVersion = clickDownloaderNdkVersion
 
     defaultConfig {
         applicationId = "com.clickdownloader.app"
@@ -86,6 +118,14 @@ android {
 
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     packaging.jniLibs.useLegacyPackaging = true
+    packaging.jniLibs.keepDebugSymbols += setOf("**/libffmpeg.zip.so", "**/libpython.zip.so")
+    sourceSets.getByName("main").jniLibs.srcDir(generatedCxxRuntime.get().asFile)
+}
+
+tasks.configureEach {
+    if (name.startsWith("merge") && (name.endsWith("JniLibFolders") || name.endsWith("NativeLibs"))) {
+        dependsOn(syncCxxRuntime)
+    }
 }
 
 kotlin {
@@ -127,9 +167,11 @@ dependencies {
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.youtubedl.ffmpeg)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clickdownloader.core.model.DownloadJob
 import com.clickdownloader.core.model.DownloadJobState
+import com.clickdownloader.core.model.DownloadRequest
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,6 +47,13 @@ class DownloadRecoveryTest {
                 errorMessage = null,
                 appVersion = "test",
                 engineVersion = null,
+            ),
+        )
+        RoomDownloadRequestRepository(database.downloadRequestDao()).upsert(
+            DownloadRequest(
+                jobId = "recover-me",
+                url = "https://example.test/video.mp4",
+                displayName = "video.mp4",
             ),
         )
 

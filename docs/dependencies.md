@@ -15,7 +15,8 @@ All dependency versions are exact and centralized in `gradle/libs.versions.toml`
 | AndroidX WorkManager | Network-constrained delayed retries and restart recovery | Apache-2.0 |
 | AndroidX DocumentFile | User-selected SAF destination finalization | Apache-2.0 |
 | youtubedl-android library 0.18.1 (bundled Python, yt-dlp and QuickJS) | On-device webpage extraction and source format discovery | GPL-3.0 |
-| youtubedl-android FFmpeg 0.18.1 | Fragment assembly, lossless audio/video merge, remux and metadata/subtitle/thumbnail embedding | GPL-3.0 |
+| youtubedl-android FFmpeg 0.17.4 | Fragment assembly, lossless audio/video merge, remux and metadata/subtitle/thumbnail embedding; pinned because 0.18.1's packaged runtime omitted required shared libraries in verified x86_64 execution | GPL-3.0 |
+| Android NDK libc++ 29.0.14206865 | ABI-matched C++ runtime required by the packaged FFmpeg executable; copied into generated build output, never committed | Android NDK terms / LLVM exception |
 | Jackson 2.11.1 | Parse the extractor's complete JSON result (version aligned with wrapper runtime) | Apache-2.0 |
 | Android platform WebView and Keystore APIs | Lazy browser, encrypted session vault and cookie bridge; no additional browser SDK | Android SDK terms |
 | AndroidX Media3 1.11.0 (ExoPlayer, UI, HLS and DASH) | Built-in verified-media playback, subtitle rendering and playback controls | Apache-2.0 |

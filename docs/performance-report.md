@@ -17,9 +17,9 @@ The values below are populated from `com.clickdownloader.benchmark-benchmarkData
 
 | Metric | Result |
 | --- | ---: |
-| Cold startup, median | 994.56 ms |
-| Warm startup, median | 363.10 ms |
-| Home navigation frame CPU duration, p50 / p90 / p95 | 47.84 / 54.79 / 59.14 ms |
+| Cold startup, median | 1,123.30 ms |
+| Warm startup, median | 326.81 ms |
+| Home navigation frame CPU duration, p50 / p90 / p95 | 48.51 / 64.66 / 65.22 ms |
 | UI process total PSS after launch | 29,061 KB |
 | Engine process at idle startup | Not running (expected) |
 
@@ -29,11 +29,11 @@ The emulator met the numerical startup targets but had poor navigation frame tim
 
 | ABI | Unsigned release size |
 | --- | ---: |
-| armeabi-v7a | 50.31 MB |
-| arm64-v8a | 56.96 MB |
-| x86 | 55.55 MB |
-| x86_64 | 59.95 MB |
-| universal | 202.36 MB |
+| armeabi-v7a | 36.88 MB |
+| arm64-v8a | 39.04 MB |
+| x86 | 40.65 MB |
+| x86_64 | 41.45 MB |
+| universal | 137.45 MB |
 
 The primary arm64 APK is about 72% smaller than the universal package while preserving the same feature and original-quality pipeline.
 

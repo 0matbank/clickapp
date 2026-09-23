@@ -7,3 +7,5 @@ Click Downloader uses one long-lived external signing key for all `com.clickdown
 Version 1.0.0 uses `versionCode` 10. Build properties can override name/code solely to produce a previous-version fixture for update testing. Every distributed APK must pass `apksigner` certificate verification and SHA-256 recording. APK binaries and signing files are ignored by Git.
 
 The release is personal sideload distribution. No silent installer or signing secret is embedded in the app, repository or GitHub workflow.
+
+Instrumented native-media tests run from the application test host so the same packaged Python/FFmpeg assets and ABI libraries as the release are exercised. FFmpeg is pinned to the last verified complete wrapper package and the ABI-matched NDK C++ runtime is generated into the APK; no SDK/NDK binary is committed.

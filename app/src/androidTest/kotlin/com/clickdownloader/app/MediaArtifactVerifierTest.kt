@@ -1,10 +1,13 @@
-package com.clickdownloader.core.media
+package com.clickdownloader.app
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clickdownloader.core.model.SelectedFormat
-import com.yausername.ffmpeg.FFmpeg
+import com.clickdownloader.core.media.CompatibleCopyProcessor
+import com.clickdownloader.core.media.LiveStreamFinalizer
+import com.clickdownloader.core.media.MediaArtifactVerifier
+import com.clickdownloader.core.media.FfmpegRuntime
 import java.io.File
 import java.security.MessageDigest
 import android.net.Uri
@@ -19,7 +22,7 @@ class MediaArtifactVerifierTest {
     @Test
     fun downloadsAndLosslesslyMergesPublic4kSourceTracks() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        FFmpeg.getInstance().init(context)
+        FfmpegRuntime.initialize(context)
         val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
         val directory = File(context.cacheDir, "public-4k-${System.nanoTime()}").apply { mkdirs() }
         val merged = File(directory, "public-4k-merged.mp4")
@@ -47,30 +50,32 @@ class MediaArtifactVerifierTest {
     }
 
     @Test
-    fun compatibleCopyPreservesOriginalAndResolution() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        FFmpeg.getInstance().init(context)
-        val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
-        val directory = File(context.cacheDir, "compatible-copy-${System.nanoTime()}").apply { mkdirs() }
-        val original = File(directory, "original.mkv")
-        execute(context, ffmpeg, "-f", "lavfi", "-i", "color=size=854x480:rate=2:duration=2", "-f", "lavfi", "-i", "sine=frequency=550:duration=2", "-c:v", "mpeg4", "-c:a", "aac", "-shortest", original.absolutePath)
-        val hashBefore = sha256(original)
+    fun compatibleCopyPreservesOriginalAndResolution() {
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            FfmpegRuntime.initialize(context)
+            val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+            val directory = File(context.cacheDir, "compatible-copy-${System.nanoTime()}").apply { mkdirs() }
+            val original = File(directory, "original.mkv")
+            execute(context, ffmpeg, "-f", "lavfi", "-i", "color=size=854x480:rate=2:duration=2", "-f", "lavfi", "-i", "sine=frequency=550:duration=2", "-c:v", "mpeg4", "-c:a", "aac", "-shortest", original.absolutePath)
+            val hashBefore = sha256(original)
 
-        val result = CompatibleCopyProcessor(context).convert(Uri.fromFile(original), File(directory, "work"), true, true)
+            val result = CompatibleCopyProcessor(context).convert(Uri.fromFile(original), File(directory, "work"), true, true)
 
-        assertTrue(original.exists())
-        assertEquals(hashBefore, sha256(original))
-        assertEquals(hashBefore, result.originalSha256)
-        assertEquals(854, result.outputInspection.width)
-        assertEquals(480, result.outputInspection.height)
-        assertTrue(result.outputInspection.hasVideo && result.outputInspection.hasAudio)
-        directory.deleteRecursively()
+            assertTrue(original.exists())
+            assertEquals(hashBefore, sha256(original))
+            assertEquals(hashBefore, result.originalSha256)
+            assertEquals(854, result.outputInspection.width)
+            assertEquals(480, result.outputInspection.height)
+            assertTrue(result.outputInspection.hasVideo && result.outputInspection.hasAudio)
+            directory.deleteRecursively()
+        }
     }
 
     @Test
     fun finalizesInterruptedLiveTransportStreamWithoutReencoding() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        FFmpeg.getInstance().init(context)
+        FfmpegRuntime.initialize(context)
         val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
         val directory = File(context.cacheDir, "live-finalizer-${System.nanoTime()}").apply { mkdirs() }
         val partial = File(directory, "live.ts.part")
@@ -87,7 +92,7 @@ class MediaArtifactVerifierTest {
     @Test
     fun verifies1080pAndLosslesslyMerged4kArtifactsContainAudio() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        FFmpeg.getInstance().init(context)
+        FfmpegRuntime.initialize(context)
         val ffmpeg = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
         val directory = File(context.cacheDir, "artifact-verifier-${System.nanoTime()}").apply { mkdirs() }
         val fullHd = File(directory, "1080p.mp4")
@@ -121,10 +126,7 @@ class MediaArtifactVerifierTest {
         val process = ProcessBuilder(listOf(ffmpeg.absolutePath, "-y", "-hide_banner", "-loglevel", "error") + arguments)
             .redirectErrorStream(true)
             .apply {
-                environment()["LD_LIBRARY_PATH"] = listOfNotNull(
-                    context.applicationInfo.nativeLibraryDir,
-                    File(context.noBackupFilesDir, "youtubedl-android/packages/ffmpeg/usr/lib").absolutePath,
-                ).joinToString(":")
+                environment()["LD_LIBRARY_PATH"] = FfmpegRuntime.libraryPath(context)
             }
             .start()
         val output = process.inputStream.bufferedReader().readText()
