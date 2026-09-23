@@ -128,6 +128,8 @@ fun ClickDownloaderApp(
             when (message) {
                 UiMessage.INVALID_URL -> R.string.invalid_url
                 UiMessage.ANALYZE_FAILED -> R.string.direct_analyze_failed
+                UiMessage.SOURCE_UNAVAILABLE -> R.string.source_unavailable
+                UiMessage.SESSION_REQUIRED -> R.string.session_required
                 UiMessage.DOWNLOAD_QUEUED -> R.string.download_queued
                 UiMessage.BATCH_PARTIAL -> R.string.batch_partial
                 UiMessage.FOLDER_SAVED -> R.string.folder_saved
@@ -206,7 +208,10 @@ fun ClickDownloaderApp(
                     },
                     onDismissBatch = viewModel::dismissBatchConfirmation,
                     onOpenBrowser = { incognito ->
-                        context.startActivity(Intent(context, BrowserActivity::class.java).putExtra(BrowserActivity.EXTRA_INCOGNITO, incognito))
+                        context.startActivity(Intent(context, BrowserActivity::class.java).apply {
+                            putExtra(BrowserActivity.EXTRA_INCOGNITO, incognito)
+                            state.inputUrl.trim().takeIf(String::isNotBlank)?.let { putExtra(BrowserActivity.EXTRA_URL, it) }
+                        })
                     },
                 )
             }
@@ -683,6 +688,7 @@ private fun SettingsScreen(
         item {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text(stringResource(R.string.settings_storage), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.storage_permission_help), style = MaterialTheme.typography.bodySmall)
                 Text(
                     text = state.settings.downloadDirectoryUri ?: stringResource(R.string.default_download_folder),
                     modifier = Modifier.padding(vertical = 12.dp),

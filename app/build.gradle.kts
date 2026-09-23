@@ -54,8 +54,8 @@ android {
         applicationId = "com.clickdownloader.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = providers.gradleProperty("clickVersionCode").orElse("11").get().toInt()
-        versionName = providers.gradleProperty("clickVersionName").orElse("1.0.1").get()
+        versionCode = providers.gradleProperty("clickVersionCode").orElse("12").get().toInt()
+        versionName = providers.gradleProperty("clickVersionName").orElse("1.0.2").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

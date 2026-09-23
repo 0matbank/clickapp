@@ -24,6 +24,16 @@ class LiveExtractorTest {
     }
 
     @Test
+    fun unavailableYouTubePageReportsTheActualReason() = runBlocking {
+        val error = runCatching {
+            YtDlpExtractor(ApplicationProvider.getApplicationContext())
+                .analyze("https://youtube.com/watch?v=mSQTCl4dvtQ")
+        }.exceptionOrNull()
+
+        assertTrue(error?.message.orEmpty().contains("video is unavailable", ignoreCase = true))
+    }
+
+    @Test
     fun isolatedEngineReturnsYouTubeFormats() = runBlocking {
         val result = IsolatedAnalysisClient(ApplicationProvider.getApplicationContext())
             .analyze("https://youtu.be/k7wyo43DMGI", null, null)

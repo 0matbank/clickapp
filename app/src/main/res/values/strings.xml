@@ -57,11 +57,14 @@
     <string name="ask_quality_every_time">Ask quality every time</string>
     <string name="show_all_formats">Every source format will always remain visible.</string>
     <string name="settings_storage">Storage</string>
+    <string name="storage_permission_help">Android does not expose a broad storage permission for this app. Choose folder opens the system picker and grants access only to that folder.</string>
     <string name="default_download_folder">System Downloads</string>
     <string name="choose_folder">Choose folder</string>
     <string name="folder_saved">Download folder saved</string>
     <string name="folder_error">This folder could not be saved. Choose another folder.</string>
-    <string name="direct_analyze_failed">This link is not a direct public audio/video file, or the server rejected it. Supported pages require the extractor.</string>
+    <string name="direct_analyze_failed">Could not analyze this page. Check the network or update the extractor in Settings, then retry.</string>
+    <string name="source_unavailable">The source reports that this video is unavailable. It may be removed, private, region-limited, or require sign-in. Open Browser and use a saved session if you can play it there.</string>
+    <string name="session_required">This source requires a signed-in session. Open Browser, sign in, enable Use session, then tap Analyze page.</string>
     <string name="download_queued">Download added to the queue.</string>
     <string name="quick_analyze_title">Choose a link to analyze</string>
     <string name="open_full_app">Open full app</string>

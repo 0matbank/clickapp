@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="storage_permission_help">এই অ্যাপের জন্য Android কোনো বিস্তৃত স্টোরেজ অনুমতি দেখায় না। ফোল্ডার বেছে নিন চাপলে সিস্টেম পিকার খুলে শুধু সেই ফোল্ডারের অনুমতি দেয়।</string>
+    <string name="source_unavailable">উৎসটি জানিয়েছে ভিডিওটি পাওয়া যাচ্ছে না। এটি সরানো, ব্যক্তিগত, অঞ্চল-সীমিত অথবা সাইন-ইন প্রয়োজন হতে পারে। Browser-এ ভিডিওটি চালাতে পারলে সংরক্ষিত session ব্যবহার করে Analyze করুন।</string>
+    <string name="session_required">এই উৎসের জন্য সাইন-ইন করা session প্রয়োজন। Browser খুলে সাইন-ইন করুন, Use session চালু করুন, তারপর Analyze page চাপুন।</string>
     <string name="app_name">ক্লিক ডাউনলোডার</string>
     <string name="nav_home">হোম</string>
     <string name="nav_downloads">ডাউনলোড</string>

@@ -54,7 +54,16 @@ data class ExtractorStatus(val running: Boolean = false, val version: String? = 
 
 data class CompatibleCopyPrompt(val media: LibraryMedia, val preflight: ConversionPreflight)
 
-enum class UiMessage { INVALID_URL, ANALYZE_FAILED, DOWNLOAD_QUEUED, BATCH_PARTIAL, FOLDER_SAVED, FOLDER_ERROR, BUBBLE_SHARE_FALLBACK, CONVERSION_PREFLIGHT_FAILED }
+enum class UiMessage { INVALID_URL, ANALYZE_FAILED, SOURCE_UNAVAILABLE, SESSION_REQUIRED, DOWNLOAD_QUEUED, BATCH_PARTIAL, FOLDER_SAVED, FOLDER_ERROR, BUBBLE_SHARE_FALLBACK, CONVERSION_PREFLIGHT_FAILED }
+
+internal fun classifyAnalysisFailure(error: Throwable): UiMessage {
+    val detail = generateSequence(error) { it.cause }.mapNotNull { it.message }.joinToString(" ").lowercase()
+    return when {
+        "sign in" in detail || "login" in detail || "log in" in detail || "cookies" in detail || "age-restricted" in detail -> UiMessage.SESSION_REQUIRED
+        "video is unavailable" in detail || "media is unavailable" in detail || "private video" in detail || "removed" in detail -> UiMessage.SOURCE_UNAVAILABLE
+        else -> UiMessage.ANALYZE_FAILED
+    }
+}
 
 private data class SelectionState(
     val pending: PendingMediaSelection? = null,
@@ -138,7 +147,7 @@ class MainViewModel(
                 }
                 .onFailure {
                     selection.value = SelectionState()
-                    message.value = UiMessage.ANALYZE_FAILED
+                    message.value = classifyAnalysisFailure(it)
                 }
         }
     }
