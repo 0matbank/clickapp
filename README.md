@@ -62,8 +62,8 @@ Phase 7 — Floating Bubble is complete:
 - Explicit, on-demand overlay permission onboarding; the service is never started while disabled
 - Draggable shortcut with edge snap, rotation-safe saved position, opacity and size controls
 - Tap-to-analyze for a user-copied HTTP(S) link and long-press-to-disable
-- Optional foreground-app allowlist through a narrowly scoped accessibility service that cannot read window content
-- Clear Copy Link / Android Share fallback when clipboard or accessibility assistance is unavailable
+- Play-Protect-compatible release without Accessibility Service; the overlay bubble only reads a URL after the user taps it
+- Clear Copy Link / Android Share fallback when clipboard content is unavailable
 
 Phase 8 — Compatible Copy and Player is complete:
 

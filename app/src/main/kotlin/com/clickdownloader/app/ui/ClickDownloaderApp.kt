@@ -7,8 +7,6 @@ import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import android.accessibilityservice.AccessibilityServiceInfo
-import android.view.accessibility.AccessibilityManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
@@ -254,8 +252,6 @@ fun ClickDownloaderApp(
                     },
                     onBubbleOpacityChanged = viewModel::setBubbleOpacity,
                     onBubbleSizeChanged = viewModel::setBubbleSizeDp,
-                    onBubbleAllowlistChanged = viewModel::setBubbleAllowlist,
-                    onAccessibilityAssistChanged = viewModel::setAccessibilityBubbleAssist,
                     onAllowLowBatteryConversionChanged = viewModel::setAllowConversionOnLowBattery,
                     onAllowHotConversionChanged = viewModel::setAllowConversionWhenHot,
                     onPauseDownloadsOnLowBatteryChanged = viewModel::setPauseDownloadsOnLowBattery,
@@ -627,8 +623,6 @@ private fun SettingsScreen(
     onBubbleEnabledChanged: (Boolean) -> Unit,
     onBubbleOpacityChanged: (Float) -> Unit,
     onBubbleSizeChanged: (Int) -> Unit,
-    onBubbleAllowlistChanged: (Set<String>) -> Unit,
-    onAccessibilityAssistChanged: (Boolean) -> Unit,
     onAllowLowBatteryConversionChanged: (Boolean) -> Unit,
     onAllowHotConversionChanged: (Boolean) -> Unit,
     onPauseDownloadsOnLowBatteryChanged: (Boolean) -> Unit,
@@ -642,12 +636,6 @@ private fun SettingsScreen(
     }
     val overlayLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (Settings.canDrawOverlays(context)) onBubbleEnabledChanged(true)
-    }
-    val accessibilityLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val manager = context.getSystemService(AccessibilityManager::class.java)
-        val enabled = manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            .any { it.resolveInfo.serviceInfo.packageName == context.packageName }
-        onAccessibilityAssistChanged(enabled)
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -727,34 +715,6 @@ private fun SettingsScreen(
                 Slider(value = state.settings.bubbleOpacity, onValueChange = onBubbleOpacityChanged, valueRange = .35f..1f)
                 Text(stringResource(R.string.bubble_size, state.settings.bubbleSizeDp))
                 Slider(value = state.settings.bubbleSizeDp.toFloat(), onValueChange = { onBubbleSizeChanged(it.toInt()) }, valueRange = 40f..80f, steps = 7)
-                Text(stringResource(R.string.bubble_allowlist), style = MaterialTheme.typography.labelLarge)
-                Text(stringResource(R.string.bubble_allowlist_help), style = MaterialTheme.typography.bodySmall)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                    items(BUBBLE_PACKAGES.entries.toList(), key = { it.key }) { entry ->
-                        FilterChip(
-                            selected = entry.key in state.settings.bubbleAllowlistedPackages,
-                            onClick = {
-                                val updated = state.settings.bubbleAllowlistedPackages.toMutableSet()
-                                if (!updated.add(entry.key)) updated.remove(entry.key)
-                                onBubbleAllowlistChanged(updated)
-                            },
-                            label = { Text(entry.value) },
-                        )
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.bubble_accessibility_assist))
-                        Text(stringResource(R.string.bubble_accessibility_warning), style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(
-                        checked = state.settings.accessibilityBubbleAssist,
-                        onCheckedChange = { enabled ->
-                            if (!enabled) onAccessibilityAssistChanged(false)
-                            else accessibilityLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                        },
-                    )
-                }
             }
         }
         item { HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) }
@@ -799,15 +759,6 @@ private fun formatDuration(millis: Long): String {
     val minutes = (millis / 60_000).coerceAtLeast(1)
     return "$minutes min"
 }
-
-private val BUBBLE_PACKAGES = linkedMapOf(
-    "com.google.android.youtube" to "YouTube",
-    "com.facebook.katana" to "Facebook",
-    "com.instagram.android" to "Instagram",
-    "com.zhiliaoapp.musically" to "TikTok",
-    "com.twitter.android" to "X",
-    "com.android.chrome" to "Chrome",
-)
 
 @Composable
 private fun <T> SettingsChoiceSection(

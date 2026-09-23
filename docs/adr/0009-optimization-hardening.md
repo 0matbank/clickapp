@@ -14,7 +14,7 @@ Status: accepted
 
 ## Security boundary
 
-The app does not bypass DRM, CAPTCHA, authentication or access controls. Secrets, cookies and signed URLs are redacted from errors and logs. Exported components are limited to user entry points; the accessibility service is permission-protected.
+The app does not bypass DRM, CAPTCHA, authentication or access controls. Secrets, cookies and signed URLs are redacted from errors and logs. Exported components are limited to user entry points, and the installable release declares no Accessibility Service.
 
 ## Consequences
 

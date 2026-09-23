@@ -196,7 +196,7 @@ class BubbleOverlayService : Service() {
 
     private fun updateVisibility() {
         bubble?.visibility = if (BubblePolicy.shouldShowForPackage(
-                currentSettings.accessibilityBubbleAssist,
+                false,
                 currentSettings.bubbleAllowlistedPackages,
                 foregroundPackage,
                 packageName,
