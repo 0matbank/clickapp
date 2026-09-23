@@ -27,7 +27,7 @@ The emulator met the numerical startup targets but had poor navigation frame tim
 
 ## Release APK size
 
-| ABI | Unsigned release size |
+| ABI | Signed release size |
 | --- | ---: |
 | armeabi-v7a | 36.88 MB |
 | arm64-v8a | 39.04 MB |
